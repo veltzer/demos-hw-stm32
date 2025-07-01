@@ -1,0 +1,3 @@
+/home/mark/git/veltzer/demos-hw-stm32/workspace/blinky-cmake/CMakeFiles/blinky-cmake.dir
+/home/mark/git/veltzer/demos-hw-stm32/workspace/blinky-cmake/CMakeFiles/edit_cache.dir
+/home/mark/git/veltzer/demos-hw-stm32/workspace/blinky-cmake/CMakeFiles/rebuild_cache.dir
