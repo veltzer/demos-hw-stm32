@@ -1,2 +1,12 @@
 The configuration of the IDE is in:
 	~/.eclipse/com.st.stm32cube*
+The board the I have is:
+	NUCLEO-WL55JC1
+These are the packages that are installed by the installer:
+	segger-jlink-udev-rules st-stlink-server st-stlink-udev-rules st-stm32cubeide-1.18.1
+The product:
+	https://www.st.com/en/evaluation-tools/nucleo-wl55jc.html
+Download link for the cubeide:
+	https://www.st.com/cloudfront/publish/stm32cubeide-deb/1.18.1/en/st-stm32cubeide_1.18.1_24813_20250409_2138_amd64.deb_bundle.sh.zip?Expires=1751351332&Signature=ML9mGunr6SDYOUZtKywBFeQ6RLR0tky5uSslf76fRuLmsJq7YMbO4ZZXaCqxTZcWBBnBdD7ntVMJCA6U0kpjXaFQVAsPI8bIvgf6gK~5ZUm1-hUoXkkZlE04fMqmG4VF8N7VSRlDcfxR7Yoc1KFyDYEFHniBCq-kk1OG4MG0RSmfXOTnqsd57JCY0vlPBnmjeuZhM76H97t5f~n4~zBASxqHL6OOlzWnOTOFSfZgYBO6zlmom7m5R0T7uu5qujhSi0pmk6i86D35pMoeqsqtRAcDlKQa6brHilo~izXyx8nav4j-vtxGvIFSoKOl2CVkocVaycTzP2RtBJwO8fDCyA__&Key-Pair-Id=K27828FUHOZJS8
+My share link:
+	https://drive.google.com/drive/folders/11ZVVuxOgN4BerLJeef9yoAvRPb3cX_B_?usp=drive_link
