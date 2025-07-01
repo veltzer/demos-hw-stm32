@@ -1,0 +1,11 @@
+- see that lsusb shows the card:
+	$ lsusb
+	...
+	Bus 001 Device 025: ID 0483:374e STMicroelectronics STLINK-V3
+	...
+- use:
+	if you are in the 'dialout' group:
+	$ st-flash erase
+	if you are not:
+	$ sudo st-flash erase
+	
