@@ -11,4 +11,11 @@ Download link for the cubeide:
 My share link:
 	https://drive.google.com/drive/folders/11ZVVuxOgN4BerLJeef9yoAvRPb3cX_B_?usp=drive_link
 packages I need from ubuntu are:
-	stlink-tools
+	$ sudo apt install stlink-tools
+more packages (optional):
+	$ sudo apt install minicom tio
+for the executables of the st package to run, and they are linked with older ncurses and old tinfo do:
+	$ wget http://security.ubuntu.com/ubuntu/pool/universe/n/ncurses/libtinfo5_6.3-2ubuntu0.1_amd64.deb
+	$ wget http://security.ubuntu.com/ubuntu/pool/universe/n/ncurses/libncurses5_6.3-2ubuntu0.1_amd64.deb
+	$ sudo apt install ./libtinfo5_6.3-2ubuntu0.1_amd64.deb ./libncurses5_6.3-2ubuntu0.1_amd64.deb
+	This is essential for the interctive debugger to work properly.
