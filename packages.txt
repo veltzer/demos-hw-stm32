@@ -1,2 +1,0 @@
-These are the packages that are installed by the installer:
-segger-jlink-udev-rules st-stlink-server st-stlink-udev-rules st-stm32cubeide-1.18.1
