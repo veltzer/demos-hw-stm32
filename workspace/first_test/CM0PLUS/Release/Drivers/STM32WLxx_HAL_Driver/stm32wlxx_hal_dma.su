@@ -1,0 +1,16 @@
+/home/mark/git/veltzer/demos-hw-stm32/workspace/first_test/Drivers/STM32WLxx_HAL_Driver/Src/stm32wlxx_hal_dma.c:1209:13:DMA_SetConfig	16	static
+/home/mark/git/veltzer/demos-hw-stm32/workspace/first_test/Drivers/STM32WLxx_HAL_Driver/Src/stm32wlxx_hal_dma.c:1252:13:DMA_CalcDMAMUXChannelBaseAndMask	16	static
+/home/mark/git/veltzer/demos-hw-stm32/workspace/first_test/Drivers/STM32WLxx_HAL_Driver/Src/stm32wlxx_hal_dma.c:152:19:HAL_DMA_Init	24	static
+/home/mark/git/veltzer/demos-hw-stm32/workspace/first_test/Drivers/STM32WLxx_HAL_Driver/Src/stm32wlxx_hal_dma.c:255:19:HAL_DMA_DeInit	16	static
+/home/mark/git/veltzer/demos-hw-stm32/workspace/first_test/Drivers/STM32WLxx_HAL_Driver/Src/stm32wlxx_hal_dma.c:370:19:HAL_DMA_Start	32	static
+/home/mark/git/veltzer/demos-hw-stm32/workspace/first_test/Drivers/STM32WLxx_HAL_Driver/Src/stm32wlxx_hal_dma.c:421:19:HAL_DMA_Start_IT	32	static
+/home/mark/git/veltzer/demos-hw-stm32/workspace/first_test/Drivers/STM32WLxx_HAL_Driver/Src/stm32wlxx_hal_dma.c:494:19:HAL_DMA_Abort	20	static
+/home/mark/git/veltzer/demos-hw-stm32/workspace/first_test/Drivers/STM32WLxx_HAL_Driver/Src/stm32wlxx_hal_dma.c:555:19:HAL_DMA_Abort_IT	16	static
+/home/mark/git/veltzer/demos-hw-stm32/workspace/first_test/Drivers/STM32WLxx_HAL_Driver/Src/stm32wlxx_hal_dma.c:616:19:HAL_DMA_PollForTransfer	40	static
+/home/mark/git/veltzer/demos-hw-stm32/workspace/first_test/Drivers/STM32WLxx_HAL_Driver/Src/stm32wlxx_hal_dma.c:744:6:HAL_DMA_IRQHandler	24	static
+/home/mark/git/veltzer/demos-hw-stm32/workspace/first_test/Drivers/STM32WLxx_HAL_Driver/Src/stm32wlxx_hal_dma.c:838:19:HAL_DMA_RegisterCallback	12	static
+/home/mark/git/veltzer/demos-hw-stm32/workspace/first_test/Drivers/STM32WLxx_HAL_Driver/Src/stm32wlxx_hal_dma.c:889:19:HAL_DMA_UnRegisterCallback	12	static
+/home/mark/git/veltzer/demos-hw-stm32/workspace/first_test/Drivers/STM32WLxx_HAL_Driver/Src/stm32wlxx_hal_dma.c:967:22:HAL_DMA_GetState	0	static
+/home/mark/git/veltzer/demos-hw-stm32/workspace/first_test/Drivers/STM32WLxx_HAL_Driver/Src/stm32wlxx_hal_dma.c:979:10:HAL_DMA_GetError	0	static
+/home/mark/git/veltzer/demos-hw-stm32/workspace/first_test/Drivers/STM32WLxx_HAL_Driver/Src/stm32wlxx_hal_dma.c:1023:19:HAL_DMA_ConfigChannelAttributes	0	static
+/home/mark/git/veltzer/demos-hw-stm32/workspace/first_test/Drivers/STM32WLxx_HAL_Driver/Src/stm32wlxx_hal_dma.c:1151:19:HAL_DMA_GetConfigChannelAttributes	8	static
