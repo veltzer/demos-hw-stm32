@@ -1,0 +1,8 @@
+#!/bin/bash -eu
+
+# reset everything
+
+CLI="/opt/st/stm32cubeide_1.18.1/plugins/com.st.stm32cube.ide.mcu.externaltools.cubeprogrammer.linux64_2.2.100.202412061334/tools/bin/STM32_Programmer_CLI"
+
+# "${CLI}" -c port=SWD mode=UR -ob RDP=0
+"${CLI}" -c port=SWD -rst
