@@ -1,0 +1,2 @@
+The configuration of the IDE is in:
+	~/.eclipse/com.st.stm32cube*
