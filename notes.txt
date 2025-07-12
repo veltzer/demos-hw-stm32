@@ -18,4 +18,10 @@ for the executables of the st package to run, and they are linked with older ncu
 	$ wget http://security.ubuntu.com/ubuntu/pool/universe/n/ncurses/libtinfo5_6.3-2ubuntu0.1_amd64.deb
 	$ wget http://security.ubuntu.com/ubuntu/pool/universe/n/ncurses/libncurses5_6.3-2ubuntu0.1_amd64.deb
 	$ sudo apt install ./libtinfo5_6.3-2ubuntu0.1_amd64.deb ./libncurses5_6.3-2ubuntu0.1_amd64.deb
-	This is essential for the interctive debugger to work properly.
+	This is essential for the interactive debugger to work properly.
+to restart your program:
+	The easiest way to stop an app running on your NUCLEO board is to simply press the black reset button
+	(labeled B2 RESET).
+	Pressing this button restarts the microcontroller.
+	It doesn't erase your code,
+	but it stops the current execution and starts your program again from the very beginning.
