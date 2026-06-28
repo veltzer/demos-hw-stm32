@@ -52,21 +52,31 @@ def repo_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
-def check_reachable(url=REACH_URL, timeout=12):
-    """Preflight: is st.com actually reachable? st.com's Akamai edge can reset
-    connections (e.g. after repeated automated hits / bot rate-limiting), which
-    otherwise shows up only as a confusing "site can't be reached" mid-run.
-    Returns (ok: bool, detail: str)."""
-    req = urllib.request.Request(url, method="GET",
-                                 headers={"User-Agent": "Mozilla/5.0"})
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return True, f"HTTP {resp.status}"
-    except urllib.error.HTTPError as e:
-        # A real HTTP response (even 403/404) means the host is reachable.
-        return True, f"HTTP {e.code}"
-    except Exception as e:
-        return False, f"{type(e).__name__}: {e}"
+# A full browser User-Agent: st.com's Akamai edge rejects bot-like/short UAs
+# (a bare "Mozilla/5.0" or default curl UA gets the connection reset), so the
+# preflight must look like a real browser or it returns false negatives.
+BROWSER_UA = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+              "(KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36")
+
+
+def check_reachable(url=REACH_URL, timeout=10, attempts=4):
+    """Preflight: is st.com actually reachable? Uses a full browser User-Agent
+    because st.com rejects bot-like UAs. Retries a few times because st.com's
+    Akamai edge can be flaky (intermittent HTTP/2 stream resets), so a single
+    failed probe is not conclusive. Any HTTP response - including 3xx/4xx -
+    counts as reachable. Returns (ok, detail)."""
+    last = ""
+    for i in range(attempts):
+        req = urllib.request.Request(url, method="GET",
+                                     headers={"User-Agent": BROWSER_UA})
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                return True, f"HTTP {resp.status}"
+        except urllib.error.HTTPError as e:
+            return True, f"HTTP {e.code}"
+        except Exception as e:
+            last = f"{type(e).__name__}: {e}"
+    return False, f"{attempts} attempts failed (last: {last})"
 
 
 def get_username() -> str:
