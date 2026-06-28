@@ -39,14 +39,34 @@ _reexec_in_venv()
 import argparse
 import re
 import subprocess
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 CUBEIDE_URL = "https://www.st.com/en/development-tools/stm32cubeide.html"
 LOGIN_HINT = "https://www.st.com/content/st_com/en/user/login.html"
+REACH_URL = "https://www.st.com/favicon.ico"  # light endpoint for preflight
 
 
 def repo_root() -> Path:
     return Path(__file__).resolve().parent.parent
+
+
+def check_reachable(url=REACH_URL, timeout=12):
+    """Preflight: is st.com actually reachable? st.com's Akamai edge can reset
+    connections (e.g. after repeated automated hits / bot rate-limiting), which
+    otherwise shows up only as a confusing "site can't be reached" mid-run.
+    Returns (ok: bool, detail: str)."""
+    req = urllib.request.Request(url, method="GET",
+                                 headers={"User-Agent": "Mozilla/5.0"})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return True, f"HTTP {resp.status}"
+    except urllib.error.HTTPError as e:
+        # A real HTTP response (even 403/404) means the host is reachable.
+        return True, f"HTTP {e.code}"
+    except Exception as e:
+        return False, f"{type(e).__name__}: {e}"
 
 
 def get_username() -> str:
@@ -90,13 +110,109 @@ def click_if_present(page, selectors, timeout=2500):
     per = max(500, int(timeout / max(1, len(selectors))))
     for sel in selectors:
         try:
-            loc = page.locator(sel).first
+            # Prefer the first VISIBLE match: a selector may match several
+            # elements where the first in the DOM is hidden (st.com renders one
+            # hidden download block per OS variant), so .first alone can wedge.
+            loc = page.locator(sel).locator("visible=true").first
             loc.wait_for(state="visible", timeout=per)
             loc.click()
             return True
         except Exception:
             continue
     return False
+
+
+def select_linux_os(page):
+    """In the Get-Software table the OS is chosen via a native <select class=swos>
+    (id swos_0); picking Linux there reveals the row's Get-latest button. Select
+    Linux in that dropdown and fire change events so the page's JS reacts.
+    Returns True if Linux was selected."""
+    sel = page.locator("select.swos, #swos_0").first
+    try:
+        sel.wait_for(state="attached", timeout=8000)
+    except Exception:
+        print("    [select_linux_os] no swos OS dropdown found", file=sys.stderr)
+        return False
+
+    # The swos OS list is populated by JS, often only AFTER a version is chosen.
+    # So pick a version in swversion first (and fire change) to trigger it.
+    ver = page.locator("select.swversion, #swversion_0").first
+    try:
+        ver_opts = ver.locator("option").all_inner_texts()
+        first_ver = next((o for o in ver_opts if o.strip() and o.strip() != "-"),
+                         None)
+        if first_ver:
+            ver.select_option(label=first_ver.strip())
+            ver.evaluate("el => el.dispatchEvent(new Event('change',{bubbles:true}))")
+            print(f"    [select_linux_os] picked version {first_ver.strip()}",
+                  file=sys.stderr)
+    except Exception as e:
+        print(f"    [select_linux_os] version pick skipped: {e}", file=sys.stderr)
+
+    # Poll for the swos options to populate (JS may load them asynchronously).
+    opts = []
+    for _ in range(12):  # up to ~6s
+        try:
+            opts = sel.locator("option").all_inner_texts()
+        except Exception:
+            opts = []
+        if any("linux" in (o or "").lower() for o in opts):
+            break
+        page.wait_for_timeout(500)
+    # If still empty, the list may load on focus/click of the OS select itself.
+    if not any("linux" in (o or "").lower() for o in opts):
+        for action in ("focus", "click"):
+            try:
+                getattr(sel, action)(timeout=2000) if action == "click" \
+                    else sel.focus(timeout=2000)
+            except Exception:
+                pass
+            page.wait_for_timeout(1200)
+            try:
+                opts = sel.locator("option").all_inner_texts()
+            except Exception:
+                opts = []
+            if any("linux" in (o or "").lower() for o in opts):
+                break
+    print(f"    [select_linux_os] swos options: {opts}", file=sys.stderr)
+    linux_label = next((o for o in opts if "linux" in (o or "").lower()), None)
+
+    # Prefer the generic Linux installer over the .deb if both are offered.
+    generic = next((o for o in opts
+                    if "linux" in o.lower() and "deb" not in o.lower()), None)
+    linux_label = generic or linux_label
+    if not linux_label:
+        # Diagnose how swos is wired (data-* url / onchange / sibling) so we can
+        # see what actually populates it.
+        try:
+            html = sel.evaluate("el => el.outerHTML.slice(0, 400)")
+            parent = sel.evaluate("el => el.parentElement ? "
+                                  "el.parentElement.outerHTML.slice(0,500) : ''")
+            print(f"    [select_linux_os] swos still empty. outerHTML:\n      "
+                  f"{html}", file=sys.stderr)
+            print(f"    [select_linux_os] swos parent:\n      {parent}",
+                  file=sys.stderr)
+        except Exception as e:
+            print(f"    [select_linux_os] diag failed: {e}", file=sys.stderr)
+        return False
+
+    try:
+        sel.select_option(label=linux_label.strip())
+    except Exception:
+        try:
+            sel.select_option(value=linux_label.strip())
+        except Exception:
+            return False
+
+    # Fire change/input so the page's JS reveals the Get-latest button.
+    try:
+        sel.evaluate(
+            "el => { el.dispatchEvent(new Event('change',{bubbles:true}));"
+            "        el.dispatchEvent(new Event('input',{bubbles:true})); }")
+    except Exception:
+        pass
+    print(f"    [select_linux_os] selected: {linux_label.strip()}", file=sys.stderr)
+    return True
 
 
 def dump_page(page, label):
@@ -112,7 +228,8 @@ def dump_page(page, label):
         pass
     try:
         rows = page.eval_on_selector_all(
-            "a, button, input[type=submit], input[type=button], [role=button]",
+            "a, button, input[type=submit], input[type=button], [role=button], "
+            "select, [class*=dropdown], [class*=select]",
             r"""els => els.map(e => ({
                     tag: e.tagName.toLowerCase(),
                     t: (e.innerText||e.value||e.getAttribute('aria-label')||'').trim().slice(0,70),
@@ -170,6 +287,8 @@ def main() -> int:
                     help="show the browser window (default: headless)")
     ap.add_argument("--timeout", type=int, default=120,
                     help="overall navigation timeout in seconds (default: 120)")
+    ap.add_argument("--skip-reachability", action="store_true",
+                    help="skip the st.com reachability preflight check")
     args = ap.parse_args()
 
     dest = Path(args.dest).expanduser().resolve()
@@ -179,6 +298,24 @@ def main() -> int:
     password = get_password()
     print(f"==> STM32CubeIDE download as {user} (password from pass/env, not shown)")
     print(f"    saving installer to: {dest}")
+
+    # Preflight: bail early (and clearly) if st.com isn't reachable, rather than
+    # failing deep in the browser flow with a vague "site can't be reached".
+    if not args.skip_reachability:
+        ok, detail = check_reachable()
+        if not ok:
+            print(f"error: st.com is not reachable right now ({detail}).",
+                  file=sys.stderr)
+            print("       This is usually temporary - st.com's CDN can reset "
+                  "connections after repeated automated requests (rate-limit / "
+                  "bot protection). Wait a while and retry; check recovery with:",
+                  file=sys.stderr)
+            print(f"         curl -sS -o /dev/null -w '%{{http_code}}\\n' "
+                  f"{REACH_URL}", file=sys.stderr)
+            print("       (a 200 means it's back). Use --skip-reachability to "
+                  "bypass this check.", file=sys.stderr)
+            return 3
+        print(f"    st.com reachable ({detail})")
 
     try:
         from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
@@ -200,13 +337,26 @@ def main() -> int:
                 sys.exit("error: could not launch a browser. Install Google "
                          "Chrome, or run 'playwright install chromium'.\n"
                          f"       ({type(e).__name__}: {e})")
-        ctx = browser.new_context(accept_downloads=True)
+        # Force English locale so the site doesn't redirect to another country
+        # site (st.com.cn / ja) and rename every control.
+        ctx = browser.new_context(
+            accept_downloads=True,
+            locale="en-US",
+            extra_http_headers={"Accept-Language": "en-US,en;q=0.9"},
+        )
         page = ctx.new_page()
         page.set_default_timeout(nav_ms)
 
-        # 1) Open the CubeIDE product page and dismiss cookie banner.
+        # 1) Open the CubeIDE product page and dismiss cookie banner. st.com can
+        #    be slow to fire domcontentloaded, so wait only for "commit" (the
+        #    navigation response) and cap it, instead of blocking up to nav_ms.
         try:
-            page.goto(CUBEIDE_URL, wait_until="domcontentloaded")
+            page.goto(CUBEIDE_URL, wait_until="commit", timeout=45000)
+            # give the page a moment to render, but don't hang on full load
+            try:
+                page.wait_for_load_state("domcontentloaded", timeout=15000)
+            except Exception:
+                pass
         except Exception as e:
             print(f"error: could not load {CUBEIDE_URL}\n"
                   f"       ({type(e).__name__}: {str(e).splitlines()[0]})\n"
@@ -224,31 +374,57 @@ def main() -> int:
         # current page (links/buttons + screenshot) before exiting - that dump
         # is what lets the selectors be fixed against the live site.
         try:
-            # 2) Open the download lightbox. On the CubeIDE page the trigger is
-            #    the "Get latest" link with id=initLightDownload (class
-            #    license-accept). Scroll it into view first.
+            # Guard: only if the site drifted to a DIFFERENT-language host
+            # (st.com.cn or /ja/), go back to the English page. Use a capped,
+            # lenient wait so it can't hang.
+            if (".com.cn" in page.url) or ("/ja/" in page.url):
+                try:
+                    page.goto(CUBEIDE_URL, wait_until="commit", timeout=45000)
+                    page.wait_for_load_state("domcontentloaded", timeout=15000)
+                except Exception:
+                    pass
+
+            # 2a) Reveal the "Get Software" table. Use the language-independent
+            #     class (getsw_scrollbutton_temp) so this works in any locale.
+            click_if_present(page, [
+                "a.getsw_scrollbutton_temp",
+                "a[href='#section-get-software-table']",
+                "a:has-text('Get Software')",
+            ], timeout=6000)
             try:
                 page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-                page.wait_for_timeout(1000)
+                page.wait_for_timeout(1200)
             except Exception:
                 pass
+
+            # 2b) The "Get latest" button is hidden until an OS is chosen in the
+            #     row's OS dropdown. Select Linux to make it appear.
+            if select_linux_os(page):
+                print("    selected OS = Linux")
+            else:
+                print("    (could not find an OS dropdown; trying anyway)")
+            page.wait_for_timeout(1500)
+
+            # 2c) Now click the first VISIBLE "Get latest". Use the
+            #     language-independent id/class first (text last) so a non-EN
+            #     locale can't break it.
             clicked = click_if_present(page, [
                 "#initLightDownload",
-                "a.license-accept:has-text('Get latest')",
+                "a.license-accept",
                 "a:has-text('Get latest')",
-                "#gatherEmail",
             ], timeout=8000)
             if not clicked:
-                print("error: could not find the 'Get latest' control "
-                      "(#initLightDownload). ST may have changed the layout; "
-                      "the page is dumped below:", file=sys.stderr)
-                dump_page(page, "CubeIDE page")
+                print("error: could not click a visible 'Get latest' control "
+                      "after selecting Linux. The page is dumped below:",
+                      file=sys.stderr)
+                dump_page(page, "CubeIDE page (after OS select)")
                 return 3
 
-            # 3) Licence agreement lightbox -> Accept (class accept-li).
+            # 3) Licence agreement lightbox -> Accept (class accept-li,
+            #    language-independent).
             page.wait_for_timeout(800)
             click_if_present(page, [
-                "a.accept-li:has-text('Accept')",
+                "a.accept-li",
                 "a:has-text('Accept')",
                 "button:has-text('Accept')",
             ], timeout=8000)
