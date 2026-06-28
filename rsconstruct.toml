@@ -1,0 +1,28 @@
+# RSConstruct build configuration for demos-hw-stm32
+#
+# The C/C++ sources under examples/ and exercises/ are STM32 target code
+# (they include vendor headers like stm32wl55xx.h and some are bare snippets),
+# so they are not host-compilable and are only term/markdown checked here.
+# The workspace/ tree is generated STM32CubeIDE/CMake output and is excluded.
+
+[vars]
+generated_excludes = [
+	"/workspace/",
+]
+
+# Lint the helper shell scripts.
+[processor.shellcheck]
+src_dirs = ["scripts"]
+src_extensions = [".sh"]
+args = ["--severity=error", "--shell=bash"]
+
+# Lint markdown (README, per-exercise exercise.md files).
+[processor.rumdl]
+src_dirs = ["."]
+src_exclude_dirs = "${generated_excludes}"
+dep_inputs = [".rumdl.toml"]
+
+# Validate this very rsconstruct.toml (and any other TOML).
+[processor.taplo]
+src_dirs = ["."]
+src_exclude_dirs = "${generated_excludes}"
