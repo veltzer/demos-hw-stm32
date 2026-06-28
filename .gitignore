@@ -1,1 +1,6 @@
 /.rsconstruct/
+# build artifacts from the exercises build system (per-exercise outputs)
+exercises/*/app.elf
+exercises/*/firmware.bin
+exercises/*/app.map
+exercises/*/.obj/

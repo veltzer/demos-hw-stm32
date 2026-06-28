@@ -23,8 +23,10 @@ void LPUART1_Init(void) {
 }
 
 void LPUART1_SendChar(char c) {
-    // Wait for transmit data register to be empty
-    while (!(LPUART1->ISR & USART_ISR_TXE));
+    // Wait for transmit data register to be empty.
+    // (On the STM32WL LPUART the flag is TXFE; with the TX FIFO disabled it
+    // behaves like the classic TXE "transmit data register empty" bit.)
+    while (!(LPUART1->ISR & USART_ISR_TXFE));
     LPUART1->TDR = c;
 }
 

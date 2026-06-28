@@ -12,9 +12,9 @@ void EXTI0_IRQHandler(void) {
 }
 
 int main(void) {
-    // Enable GPIOA and SYSCFG clocks
+    // Enable GPIOA clock. (SYSCFG has no separate clock-enable bit on the
+    // STM32WL55 - it is always clocked - so no RCC line is needed for it.)
     RCC->AHB2ENR |= RCC_AHB2ENR_GPIOAEN;
-    RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;
 
     // Configure PA15 (LD1) as output
     GPIOA->MODER &= ~GPIO_MODER_MODE15_1;

@@ -1,5 +1,12 @@
 #include "stm32wl55xx.h"
 
+// NOTE: this exercise is a stub that COMPILES but does not yet keep real time.
+// HAL_GetTick() here is a placeholder free-running counter (not millisecond
+// based). Wiring it to a real time base (e.g. configuring SysTick to tick every
+// 1 ms and incrementing a counter in SysTick_Handler) is the actual exercise.
+static volatile uint32_t fake_tick;
+static uint32_t HAL_GetTick(void) { return ++fake_tick; }
+
 // --- Task 1: Blink LD1 slowly ---
 void task1_blink_slow(void) {
     static uint32_t last_run = 0;
@@ -26,7 +33,8 @@ void (*tasks[])(void) = {
 const int NUM_TASKS = sizeof(tasks) / sizeof(void*);
 
 int main(void) {
-    HAL_Init(); // Initializes SysTick for HAL_GetTick()
+    // TODO: set up a real 1 ms time base here (SysTick) so HAL_GetTick()
+    // returns milliseconds. For now it is just a free-running counter.
 
     // Setup GPIOs for LD1 and LD2 (as in exercise 2)
     RCC->AHB2ENR |= RCC_AHB2ENR_GPIOAEN;
