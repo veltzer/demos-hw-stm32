@@ -6,3 +6,5 @@
 /exercises/*/.obj/
 # python __pycache__ folders
 __pycache__
+# downloaded installers (e.g. STM32CubeIDE)
+/download/

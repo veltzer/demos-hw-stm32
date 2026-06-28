@@ -163,8 +163,9 @@ def dump_page(page, label):
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="Download STM32CubeIDE (Linux) from st.com.")
-    ap.add_argument("--dest", default=os.environ.get("CUBEIDE_DEST", str(repo_root())),
-                    help="directory to save the installer into (default: repo root)")
+    ap.add_argument("--dest",
+                    default=os.environ.get("CUBEIDE_DEST", str(repo_root() / "download")),
+                    help="directory to save the installer into (default: <repo>/download)")
     ap.add_argument("--headed", action="store_true",
                     help="show the browser window (default: headless)")
     ap.add_argument("--timeout", type=int, default=120,
@@ -223,73 +224,78 @@ def main() -> int:
         # current page (links/buttons + screenshot) before exiting - that dump
         # is what lets the selectors be fixed against the live site.
         try:
-            # 2) Find and click the "Get latest" / download control for the
-            #    generic Linux installer. It is below the fold, so scroll first;
-            #    ST labels these variously, so try several selectors.
+            # 2) Open the download lightbox. On the CubeIDE page the trigger is
+            #    the "Get latest" link with id=initLightDownload (class
+            #    license-accept). Scroll it into view first.
             try:
                 page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-                page.wait_for_timeout(1500)
+                page.wait_for_timeout(1000)
             except Exception:
                 pass
             clicked = click_if_present(page, [
+                "#initLightDownload",
+                "a.license-accept:has-text('Get latest')",
                 "a:has-text('Get latest')",
-                "button:has-text('Get latest')",
-                "button:has-text('Get software')",
-                "a:has-text('Get software')",
-                "a:has-text('Download latest')",
-                "[role=button]:has-text('Get')",
-                "tr:has-text('Linux'):has-text('Installer') a:has-text('Get')",
-                "a[href*='get-software']",
+                "#gatherEmail",
             ], timeout=8000)
             if not clicked:
-                print("error: could not find the CubeIDE Linux 'Get latest' "
-                      "control (ST may have changed the layout). The page's "
-                      "links/buttons are listed below so the selector can be "
-                      "fixed:", file=sys.stderr)
+                print("error: could not find the 'Get latest' control "
+                      "(#initLightDownload). ST may have changed the layout; "
+                      "the page is dumped below:", file=sys.stderr)
                 dump_page(page, "CubeIDE page")
                 return 3
 
-            # 3) Licence agreement dialog -> Accept.
+            # 3) Licence agreement lightbox -> Accept (class accept-li).
+            page.wait_for_timeout(800)
             click_if_present(page, [
-                "button:has-text('Accept')",
-                "input[type='submit'][value*='Accept']",
+                "a.accept-li:has-text('Accept')",
                 "a:has-text('Accept')",
+                "button:has-text('Accept')",
             ], timeout=8000)
 
-            # 4) ST then asks to log in (or shows a "login to download" form).
-            #    Fill the My ST credentials.
+            # 4) If a login/guest dialog appears (only when NOT already logged
+            #    in), authenticate with the My ST credentials. If already logged
+            #    in, this dialog is skipped and the download starts directly.
+            page.wait_for_timeout(800)
+            login_btn = page.locator(
+                ".email-login:has-text('Log in to MyST'), .email-login").first
             try:
-                page.locator("input[type='email'], input[name*='mail'], #username") \
-                    .first.fill(user, timeout=15000)
-                page.locator("input[type='password'], #password") \
-                    .first.fill(password, timeout=15000)
-                click_if_present(page, [
-                    "button:has-text('Login')",
-                    "button:has-text('Sign in')",
-                    "input[type='submit']",
-                    "button[type='submit']",
-                ])
-            except PWTimeout:
-                # Already authenticated (cookies) — continue to the download.
-                print("    (no login form shown; assuming existing session)")
+                if login_btn.is_visible(timeout=3000):
+                    login_btn.click()
+                    # CAS login page: fill username + password and submit.
+                    page.locator(
+                        "input[type='email'], input[name='username'], #username"
+                    ).first.fill(user, timeout=20000)
+                    page.locator(
+                        "input[type='password'], #password"
+                    ).first.fill(password, timeout=20000)
+                    click_if_present(page, [
+                        "button:has-text('Login')",
+                        "button:has-text('Sign in')",
+                        "input[type='submit']",
+                        "button[type='submit']",
+                    ])
+                    page.wait_for_timeout(1500)
+            except Exception:
+                # No login dialog -> already authenticated; proceed.
+                pass
 
-            # 5) The accept/login usually triggers the file download. Capture it.
+            # 5) Capture the download. After accept/login the .sh download
+            #    starts; if a final "Download" button is shown, click it.
             try:
                 with page.expect_download(timeout=nav_ms) as dl_info:
-                    # Re-trigger the control in case login navigated away.
                     click_if_present(page, [
+                        "#emailSubmit",
+                        "button:has-text('Download')",
                         "a:has-text('Download latest')",
-                        "a:has-text('Get latest')",
-                        "a[href*='.sh']",
-                        "a[href*='stm32cubeide']",
+                        "a[href$='.sh']",
                     ], timeout=8000)
                 download = dl_info.value
             except PWTimeout:
-                print("error: no download started after login/accept. The login "
-                      "may have failed or ST changed the flow. The current page "
-                      "is dumped below; check your My ST login at "
+                print("error: no download started after accept/login. The "
+                      "current page is dumped below; check your My ST login at "
                       f"{LOGIN_HINT}.", file=sys.stderr)
-                dump_page(page, "after login/accept")
+                dump_page(page, "after accept/login")
                 return 3
 
             suggested = download.suggested_filename or "stm32cubeide-linux-installer.sh"
