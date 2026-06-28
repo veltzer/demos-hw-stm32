@@ -1,6 +1,6 @@
 The configuration of the IDE is in:
 	~/.eclipse/com.st.stm32cube*
-The board the I have is:
+The board that I have is:
 	NUCLEO-WL55JC1
 These are the packages that are installed by the installer:
 	segger-jlink-udev-rules st-stlink-server st-stlink-udev-rules st-stm32cubeide-1.18.1
