@@ -1,0 +1,76 @@
+The ST-LINK status LED (LD4 / "COM") - what it means and what happens on connect
+================================================================================
+
+Which LED is this
+-----------------
+This is the ST-LINK status LED on the board (the COM LED, LD4). It is NOT a
+user LED. It is wired to a pin of the ST-LINK MCU (the second microcontroller
+on the board that acts as the debug probe) and is driven entirely by the
+closed-source ST-LINK firmware. Your code, the host tools and the Linux USB
+stack have NO register/GPIO/API to set it. It is an indicator, not an actuator.
+
+What the colors mean (ST-LINK V3)
+---------------------------------
+red (steady)        powered + USB enumerated, but NO successful target
+                    communication yet (idle).
+red/green blinking  communication in progress (connect, read, flash).
+green (steady)      successful host/target communication established.
+
+The firmware is a small state machine; the LED is its output. You can only
+influence its inputs, not the LED directly:
+  1. USB power / enumeration  (usbreset forces a re-enumeration)
+  2. target present on SWD     (probe reachable -> green, not reachable -> red)
+  3. an active host session    (a tool talking to it -> blink, leaves it green)
+
+What happens when you connect / reconnect the board
+---------------------------------------------------
+1. unplug          -> probe loses power, LED off.
+2. plug back in     -> firmware boots and enumerates on USB; for a brief
+                       window it is RED (idle, no comms yet).
+3. moment later     -> firmware checks SWD, finds the STM32WL target (hardwired
+                       on the same PCB, powered from the same USB), settles GREEN.
+So: a quick red flash, then steady green. It does NOT stay red.
+
+Why green is the resting state on this board
+--------------------------------------------
+The debug probe and the STM32WL target are on the same board, hardwired and
+powered together. The moment the probe boots it sees a live, healthy target,
+so it settles to green on its own. Red is only the transient "not yet talking /
+no target" state, which is why it will not stick.
+
+Why it was RED CONSTANTLY before (during this setup session)
+------------------------------------------------------------
+The USB device node was root-owned (crw-rw-r--), so every tool run as the
+normal user failed with "access error / Found 0 stlink programmers". NO host
+ever completed a communication session, so the firmware stayed in its red idle
+state - constantly, because the condition never changed.
+
+The fix was a permissions/udev fix (NOT a hardware fix):
+  - stlink-tools ships the udev rule /lib/udev/rules.d/49-stlinkv3.rules which
+    sets MODE:="0666" for 0483:374e, but udev only applies rules at device-add
+    time. stlink-tools was installed AFTER the board was already plugged in, so
+    the existing device kept its root-only permissions.
+  - reload + re-apply the rules (see scripts/setup_udev_restart.sh):
+        sudo udevadm control --reload-rules
+        sudo udevadm trigger --action=add --subsystem-match=usb
+    (or simply unplug and replug the board).
+  - after that the node became crw-rw-rw- and st-info worked as the normal
+    user; the first successful session flipped the LED to green.
+
+Can I turn THAT LED red on demand?
+----------------------------------
+Only briefly. scripts/stlink_led_red.sh runs `usbreset 0483:374e`, which drops
+the host session and re-enumerates the device -> a red flash. But the firmware
+immediately re-checks, finds the target, and returns to green. You cannot pin
+it red while the board is connected and healthy, because the firmware owns the
+LED. A lasting red would require the probe to genuinely fail to find a target
+(cut SWD / unpower the MCU side), which is not possible in software on this
+integrated board. The only way to literally control the LED would be to reflash
+the ST-LINK firmware itself - outside normal use.
+
+Related scripts
+---------------
+scripts/check_connected.sh     check the board is connected (USB + SWD).
+scripts/setup_udev_restart.sh  reload udev rules onto an already-connected board.
+scripts/stlink_led_red.sh      usbreset the probe (brief red flash).
+scripts/install_deps.sh        install ubuntu deps (usbutils, stlink-tools, ...).
