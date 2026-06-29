@@ -42,7 +42,7 @@ compile fails on a missing `stm32wl55xx.h`. Override the location with
 What stays in the repo (`exercises/common/`) is only what is genuinely *ours*:
 the customized startup (`startup_stm32wl55jcix*.s`), linker scripts (the M4 one
 uses 128K bank 1 so the M0+ image fits in bank 2), `system_stm32wlxx.c`, and the
-HAL config (`hal_config/stm32wlxx_hal_conf.h`). CMSIS and the HAL drivers are
+HAL config (`stm32wlxx_hal_conf.h`). CMSIS and the HAL drivers are
 taken from the clone (its versions are newer than the previously-vendored
 copies). Each `main_hal.c` defines its own `SysTick_Handler` (forwarding to
 `HAL_IncTick`), so HAL_Delay/HAL_GetTick work without any shared glue file.

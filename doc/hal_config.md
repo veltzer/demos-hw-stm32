@@ -1,11 +1,10 @@
 # `stm32wlxx_hal_conf.h` — the HAL configuration header
 
-`exercises/common/hal_config/stm32wlxx_hal_conf.h` is the one piece of the HAL
-setup that is **ours**, not vendor code. The HAL drivers and CMSIS come from the
-cloned `STM32CubeWL/` package (gitignored); this config header stays in the repo
-because it is project-specific. Every HAL build is compiled with
-`-Iexercises/common/hal_config` so this file is the `stm32wlxx_hal_conf.h` the
-HAL sources pick up.
+`exercises/common/stm32wlxx_hal_conf.h` is the one piece of the HAL setup that is
+**ours**, not vendor code. The HAL drivers and CMSIS come from the cloned
+`STM32CubeWL/` package (gitignored); this config header stays in the repo because
+it is project-specific. Every HAL build is compiled with `-Iexercises/common` so
+this file is the `stm32wlxx_hal_conf.h` the HAL sources pick up.
 
 ## What it does
 

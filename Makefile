@@ -91,15 +91,14 @@ LDFLAGS_CM0 := $(CPU_CM0) -T$(LDSCRIPT_CM0) -Wl,--gc-sections \
 # ---- HAL support (for the single_core_hal exercises) -----------------------
 # The full STM32WL HAL/LL/CMSIS comes from the STM32CubeWL package cloned into
 # the repo root by scripts/clone_cubewl.sh (gitignored -- NOT vendored in-repo,
-# so no duplication). Only our project config (stm32wlxx_hal_conf.h) lives in the
-# repo, under common/hal_config/. (Each main_hal.c defines its own
-# SysTick_Handler.) CUBEWL is defined near the top with the CMSIS includes.
+# so no duplication). Only our project config (common/stm32wlxx_hal_conf.h) lives
+# in the repo. (Each main_hal.c defines its own SysTick_Handler.) CUBEWL is
+# defined near the top with the CMSIS includes.
 HAL_DRV    := $(CUBEWL)/Drivers/STM32WLxx_HAL_Driver
-HAL_CFGDIR := $(COMMON)/hal_config
 HAL_INCLUDES := $(INCLUDES) \
 	-I$(HAL_DRV)/Inc \
 	-I$(HAL_DRV)/Inc/Legacy \
-	-I$(HAL_CFGDIR)
+	-I$(COMMON)
 # HAL needs USE_HAL_DRIVER; the M4 cpu/defines are otherwise the same.
 CFLAGS_HAL := $(CPU) $(DEFS) -DUSE_HAL_DRIVER $(HAL_INCLUDES) -Wall -Wextra -O2 -g3 \
 	-ffunction-sections -fdata-sections -MMD -MP
@@ -112,9 +111,9 @@ CFLAGS_HALDRV := $(CPU) $(DEFS) -DUSE_HAL_DRIVER $(HAL_INCLUDES) -w -O2 -g3 \
 # library + objects build under common/ (NOT inside the gitignored clone).
 # Exclude *_template.c: those are copy-me starting points, not buildable drivers.
 HAL_DRV_SRCS := $(filter-out %_template.c,$(wildcard $(HAL_DRV)/Src/*.c))
-HAL_LIBDIR   := $(COMMON)/.hal_obj
+HAL_LIBDIR   := $(COMMON)/.hal_obj_cm4
 HAL_LIBOBJS  := $(patsubst $(HAL_DRV)/Src/%.c,$(HAL_LIBDIR)/%.o,$(HAL_DRV_SRCS))
-HAL_LIB      := $(COMMON)/libhal.a
+HAL_LIB      := $(COMMON)/libhal_cm4.a
 AR           := $(PREFIX)ar
 
 # Same HAL, compiled for the M0+ (cortex-m0plus): the cores have different
@@ -367,10 +366,7 @@ list:
 	@for e in $(DUALNAMES); do echo "  $$e"; done
 
 clean:
+	$(Q)find $(DIR) -name '*.bin' -o -name '*.elf' -o -name '*.map' | xargs -r rm -f
 	$(Q)rm -rf $(SINGLEDIR)/*/.obj $(DUALDIR)/*/.obj $(HAL_LIBDIR) $(HAL_LIBDIR_CM0)
 	$(Q)rm -f $(HAL_LIB) $(HAL_LIB_CM0)
-	$(Q)rm -f $(SINGLEDIR)/*/app_bare.elf $(SINGLEDIR)/*/firmware_bare.bin $(SINGLEDIR)/*/app_bare.map
-	$(Q)rm -f $(SINGLEDIR)/*/app_hal.elf $(SINGLEDIR)/*/firmware_hal.bin $(SINGLEDIR)/*/app_hal.map
-	$(Q)rm -f $(DUALDIR)/*/app_cm4_*.elf $(DUALDIR)/*/firmware_cm4_*.bin $(DUALDIR)/*/app_cm4_*.map
-	$(Q)rm -f $(DUALDIR)/*/app_cm0p_*.elf $(DUALDIR)/*/firmware_cm0p_*.bin $(DUALDIR)/*/app_cm0p_*.map
 	@echo "cleaned"
