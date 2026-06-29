@@ -1,6 +1,6 @@
 #!/bin/bash -eu
 # flash a pre-built single-core exercise to the board with STM32_Programmer_CLI.
-# This script does NOT build -- run `make <exercise>` (or build_exercise.sh) first.
+# This script does NOT build -- run `make <exercise>` first.
 # usage: scripts/flash_exercise.sh <exercise> [bare|hal]
 #   scripts/flash_exercise.sh 02_serial_counter        # bare-metal (default)
 #   scripts/flash_exercise.sh 02_serial_counter hal    # HAL version
