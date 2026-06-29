@@ -28,14 +28,20 @@ When adding a tool to any script or the Makefile, add its package to
 
 ## Build system
 
-`Makefile` lives at the repo root and builds the single-core exercises under
-`exercises/`.
+`Makefile` lives at the repo root and builds the exercises under `exercises/`,
+which is split into two trees plus shared support:
+
+- `exercises/singlecore/NN_name/` — one `main.c`, built into a single M4 image.
+- `exercises/dualcore/NN_name/` — `main_cm4.c` + `main_cm0p.c`, built into two
+  images, one per core (see below).
+- `exercises/common/` — shared CMSIS / startup / linker support for both.
 
 - The set of buildable exercises is **discovered from the filesystem**, not
-  hardcoded: an `exercises/NN_name/` dir with a `main.c` and no
-  `main_cm4.c` is a single-core exercise and is built. A dir with a
-  `main_cm4.c` + `main_cm0p.c` is a dual-core exercise: it builds **two**
-  images, one per core (see below). Sourceless dirs are excluded automatically.
+  hardcoded: the directory tree IS the classification. Everything under
+  `singlecore/` with a `main.c` builds one M4 image; everything under
+  `dualcore/` with a `main_cm4.c` builds two. Sourceless dirs (e.g. a
+  write-up-only exercise) are ignored, since discovery keys off the source
+  files' presence.
 - Dual-core exercises build an M4 image (`app_cm4.elf`/`firmware_cm4.bin`) from
   `main_cm4.c` and an M0+ image (`app_cm0p.elf`/`firmware_cm0p.bin`) from
   `main_cm0p.c`. The M0+ uses its own startup (`startup_stm32wl55jcix_cm0plus.s`,
@@ -67,10 +73,14 @@ Commands:
 
 ## Flashing
 
-    scripts/build_exercise.sh <name>   # build one exercise
+    scripts/build_exercise.sh <name>   # build one exercise (by bare name)
     scripts/build_all.sh               # build all (make -k)
-    scripts/flash_exercise.sh <name>   # build + st-flash to 0x08000000
+    scripts/flash_exercise.sh <name>   # build + flash a single-core exercise
+                                       #   (STM32_Programmer_CLI, connect-under-reset)
     scripts/flash_menu.sh              # TUI: pick an exercise, build + flash
+
+Only single-core exercises are flashable; dual-core ones build two images but
+need option bytes to run, so the flash scripts refuse them with a message.
 
 ## Downloading STM32CubeIDE
 
@@ -99,13 +109,14 @@ installer from st.com, **fully unattended** (no AI / no manual browser steps).
 - Shell scripts start with `#!/bin/bash -eu`; they pass `shellcheck
   --severity=error --shell=bash`. The repo's `rsconstruct.toml` lints scripts
   (shellcheck), markdown (rumdl), and TOML (taplo).
-- The `exercises/*/main.c` are bare register-level programs. Some have genuine
-  bugs that the build surfaces; the build system is a plain compiler and does
-  not paper over them.
-- Dual-core exercises (`08`, `09`) now **build** both cores' images (M4 + M0+)
-  via the from-scratch M0+ startup/linker added under `exercises/common/`. They
-  are **not flashed/run** yet: that needs the `C2BOOT`/`SBRV` option bytes set
-  so the M0+ boots from flash bank 2, plus flashing both images (TODO).
+- The `exercises/*/*/main*.c` are bare register-level programs. Some have
+  genuine bugs that the build surfaces; the build system is a plain compiler and
+  does not paper over them.
+- Dual-core exercises (under `exercises/dualcore/`, numbered from `00`) now
+  **build** both cores' images (M4 + M0+) via the from-scratch M0+
+  startup/linker under `exercises/common/`. They are **not flashed/run** yet:
+  that needs the `C2BOOT`/`SBRV` option bytes set so the M0+ boots from flash
+  bank 2, plus flashing both images (TODO).
 - The ST-LINK exposes a USB Virtual COM Port at `/dev/ttyACM0`. Serial output
   appears only if firmware transmits on a UART that is routed to that VCP, at a
   matching baud rate.

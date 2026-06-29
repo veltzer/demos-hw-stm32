@@ -1,9 +1,10 @@
 /.rsconstruct/
-# build artifacts from the exercises build system (per-exercise outputs)
-/exercises/*/app.elf
-/exercises/*/firmware.bin
-/exercises/*/app.map
-/exercises/*/.obj/
+# build artifacts from the exercises build system (per-exercise outputs in the
+# singlecore/ and dualcore/ trees; dual-core also emits *_cm4 / *_cm0p variants)
+/exercises/*/*/app*.elf
+/exercises/*/*/firmware*.bin
+/exercises/*/*/app*.map
+/exercises/*/*/.obj/
 # python __pycache__ folders
 __pycache__
 # downloaded installers (e.g. STM32CubeIDE)

@@ -1,22 +1,23 @@
-# Build system for the STM32WL55 single-core exercises.
+# Build system for the STM32WL55 exercises.
 #
 # Usage:
-#   make                       # build every single-core exercise (incremental)
-#   make 02_serial_counter     # build just one exercise
+#   make                       # build every exercise (incremental)
+#   make 02_serial_counter     # build just one exercise (by bare name)
 #   make list                  # list the exercises that will be built
 #   make clean
 #   make V=1 ...               # verbose: echo the underlying commands
 #   make -j                    # exercises build in parallel
 #
-# This Makefile lives at the repo root and operates on exercises/.
-# The set of buildable exercises is DISCOVERED from the filesystem, not listed:
-# any exercises/NN_name/ that has a main.c and no main_cm4.c is a
-# single-core exercise and is built. Each is linked against the shared CMSIS /
-# startup / linker support under exercises/common/. Builds are incremental
-# (per-object compilation with -MMD header dependency tracking).
+# This Makefile lives at the repo root and operates on two exercise trees:
+#   exercises/singlecore/NN_name/  - one main.c, built into one M4 image
+#   exercises/dualcore/NN_name/    - main_cm4.c + main_cm0p.c, built into two
+#                                    images (one per core, non-overlapping flash)
+# Both link against the shared CMSIS / startup / linker support under
+# exercises/common/. The directory tree IS the single-vs-dual classification.
+# Builds are incremental (per-object compilation, -MMD header deps).
 #
-# Excluded automatically: dual-core exercises (they carry a main_cm4.c and need
-# a from-scratch Cortex-M0+ startup/linker/option-bytes) and sourceless ones.
+# Sourceless dirs (e.g. an exercise that is just a write-up) are ignored, since
+# discovery keys off the presence of main.c / main_cm4.c.
 
 # ---- verbosity -------------------------------------------------------------
 # Quiet by default; `make V=1` shows the actual commands.
@@ -39,8 +40,13 @@ CPU     := -mcpu=cortex-m4 -mthumb -mfloat-abi=soft
 DEFS    := -DSTM32WL55xx -DCORE_CM4
 
 # ---- paths -----------------------------------------------------------------
-# This Makefile lives at the repo root; the exercises live under exercises/.
+# This Makefile lives at the repo root. Exercises live in two sibling trees:
+#   exercises/singlecore/NN_name/  - one main.c, built for the M4
+#   exercises/dualcore/NN_name/    - main_cm4.c + main_cm0p.c, built per core
+# with shared CMSIS/startup/linker support in exercises/common/.
 DIR     := exercises
+SINGLEDIR := $(DIR)/singlecore
+DUALDIR   := $(DIR)/dualcore
 COMMON  := $(DIR)/common
 LDSCRIPT := $(COMMON)/STM32WL55JCIX_FLASH.ld
 STARTUP  := $(COMMON)/startup_stm32wl55jcix.s
@@ -82,16 +88,13 @@ libc_nano\.a|in function .(_close_r|_lseek_r|_read_r|_write_r|_sbrk_r|_fstat_r|_
 has a LOAD segment with RWX permissions|warn-rwx-segments
 
 # ---- discovery -------------------------------------------------------------
-# Candidate exercises: every exercises/NN_name dir holding a main.c.
-candidates := $(sort $(patsubst %/,%,$(dir \
-	$(wildcard $(DIR)/[0-9]*_*/main.c))))
-# Dual-core exercises carry a main_cm4.c (and a main_cm0p.c). They are NOT in
-# the single-core list (which builds one main.c against the M4 support); they
-# get their own rules that build TWO images, one per core.
-dualcore   := $(sort $(patsubst %/,%,$(dir $(wildcard $(DIR)/[0-9]*_*/main_cm4.c))))
-# Single-core full paths (exercises/NN_name) used by the build rules ...
-EXERCISES  := $(filter-out $(dualcore),$(candidates))
-# ... and their bare names (NN_name) used as convenience targets.
+# The directory tree IS the classification: everything under singlecore/ builds
+# one M4 image; everything under dualcore/ builds two images (M4 + M0+). A dir
+# must hold the expected source (main.c, or main_cm4.c) to be picked up, so the
+# sourceless RTOS stub is ignored automatically.
+EXERCISES  := $(sort $(patsubst %/,%,$(dir $(wildcard $(SINGLEDIR)/[0-9]*_*/main.c))))
+dualcore   := $(sort $(patsubst %/,%,$(dir $(wildcard $(DUALDIR)/[0-9]*_*/main_cm4.c))))
+# Bare names (NN_name) used as convenience targets.
 NAMES      := $(notdir $(EXERCISES))
 DUALNAMES  := $(notdir $(dualcore))
 
@@ -205,11 +208,11 @@ endef
 $(foreach e,$(dualcore),$(eval $(call DUALCORE_rules,$e)))
 
 # Convenience targets so you can build by bare name (e.g. `make 02_serial_counter`)
-# or by full path (`make exercises/02_serial_counter`); both map to its binary.
-$(NAMES): %: $(DIR)/%/firmware.bin
+# or by full path (`make exercises/singlecore/02_serial_counter`).
+$(NAMES): %: $(SINGLEDIR)/%/firmware.bin
 $(EXERCISES): %: %/firmware.bin
 # Dual-core bare-name / full-path targets build BOTH images.
-$(DUALNAMES): %: $(DIR)/%/firmware_cm4.bin $(DIR)/%/firmware_cm0p.bin
+$(DUALNAMES): %: $(DUALDIR)/%/firmware_cm4.bin $(DUALDIR)/%/firmware_cm0p.bin
 $(dualcore): %: %/firmware_cm4.bin %/firmware_cm0p.bin
 .PHONY: $(NAMES) $(EXERCISES) $(DUALNAMES) $(dualcore)
 
@@ -218,8 +221,8 @@ list:
 	@for e in $(DUALNAMES); do echo "  $$e (dual-core: M4 + M0+)"; done
 
 clean:
-	$(Q)rm -rf $(DIR)/*/.obj
-	$(Q)rm -f $(DIR)/*/app.elf $(DIR)/*/firmware.bin $(DIR)/*/app.map
-	$(Q)rm -f $(DIR)/*/app_cm4.elf $(DIR)/*/firmware_cm4.bin $(DIR)/*/app_cm4.map
-	$(Q)rm -f $(DIR)/*/app_cm0p.elf $(DIR)/*/firmware_cm0p.bin $(DIR)/*/app_cm0p.map
+	$(Q)rm -rf $(SINGLEDIR)/*/.obj $(DUALDIR)/*/.obj
+	$(Q)rm -f $(SINGLEDIR)/*/app.elf $(SINGLEDIR)/*/firmware.bin $(SINGLEDIR)/*/app.map
+	$(Q)rm -f $(DUALDIR)/*/app_cm4.elf $(DUALDIR)/*/firmware_cm4.bin $(DUALDIR)/*/app_cm4.map
+	$(Q)rm -f $(DUALDIR)/*/app_cm0p.elf $(DUALDIR)/*/firmware_cm0p.bin $(DUALDIR)/*/app_cm0p.map
 	@echo "cleaned"

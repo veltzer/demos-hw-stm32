@@ -5,7 +5,8 @@
 # flashed with st-flash.
 
 HERE="$(dirname "$0")/.."
-EXDIR="$HERE/exercises"
+SINGLEDIR="$HERE/exercises/singlecore"
+DUALDIR="$HERE/exercises/dualcore"
 
 # pick a menu backend
 if command -v whiptail >/dev/null 2>&1; then
@@ -18,26 +19,29 @@ else
 	exit 1
 fi
 
-# Build the menu item list by scanning the exercises, mirroring the Makefile's
-# classification: main.c/main_1.c -> buildable; main_cm4.c -> dual-core;
-# neither -> no source. Unsupported entries are shown but tagged.
+# Build the menu by scanning both exercise trees. The directory is the
+# classification: singlecore/ exercises are flashable; dualcore/ ones build two
+# images and need option bytes to run, so they're shown but not selectable.
 items=()        # tag + description pairs for the menu
 declare -A buildable=()
-for dir in "$EXDIR"/[0-9]*_*/; do
+for dir in "$SINGLEDIR"/[0-9]*_*/; do
 	[ -d "$dir" ] || continue
 	name="$(basename "$dir")"
-	if [ -f "$dir/main_cm4.c" ]; then
-		items+=("$name" "(dual-core - unsupported)")
-	elif [ -f "$dir/main.c" ] || [ -f "$dir/main_1.c" ]; then
+	if [ -f "$dir/main.c" ]; then
 		items+=("$name" "single-core")
 		buildable["$name"]=1
 	else
 		items+=("$name" "(no source - unsupported)")
 	fi
 done
+for dir in "$DUALDIR"/[0-9]*_*/; do
+	[ -d "$dir" ] || continue
+	name="$(basename "$dir")"
+	items+=("$name" "(dual-core - not flashable yet)")
+done
 
 if [ "${#items[@]}" -eq 0 ]; then
-	echo "error: no exercises found under $EXDIR" >&2
+	echo "error: no exercises found under $SINGLEDIR or $DUALDIR" >&2
 	exit 1
 fi
 
