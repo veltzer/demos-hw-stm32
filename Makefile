@@ -40,13 +40,16 @@ CPU     := -mcpu=cortex-m4 -mthumb -mfloat-abi=soft
 DEFS    := -DSTM32WL55xx -DCORE_CM4
 
 # ---- paths -----------------------------------------------------------------
-# This Makefile lives at the repo root. Exercises live in two sibling trees:
-#   exercises/singlecore/NN_name/  - one main.c, built for the M4
-#   exercises/dualcore/NN_name/    - main_cm4.c + main_cm0p.c, built per core
-# with shared CMSIS/startup/linker support in exercises/common/.
+# This Makefile lives at the repo root. Exercises live in two trees:
+#   exercises/single_core/NN_name/ - main_bare.c (register-level) AND main_hal.c
+#                                    (same lesson via the HAL); each builds its
+#                                    own M4 image (firmware_bare.bin / _hal.bin).
+#   exercises/dual_core/NN_name/   - main_cm4.c + main_cm0p.c, one image per core.
+# with shared CMSIS/startup/linker support in exercises/common/ (and the vendored
+# STM32WL HAL under exercises/common/hal/).
 DIR     := exercises
-SINGLEDIR := $(DIR)/singlecore
-DUALDIR   := $(DIR)/dualcore
+SINGLEDIR := $(DIR)/single_core
+DUALDIR   := $(DIR)/dual_core
 COMMON  := $(DIR)/common
 LDSCRIPT := $(COMMON)/STM32WL55JCIX_FLASH.ld
 STARTUP  := $(COMMON)/startup_stm32wl55jcix.s
@@ -79,6 +82,26 @@ ASFLAGS_CM0 := $(CPU_CM0) -MMD -MP
 LDFLAGS_CM0 := $(CPU_CM0) -T$(LDSCRIPT_CM0) -Wl,--gc-sections \
 	--specs=nano.specs --specs=nosys.specs
 
+# ---- HAL support (for the single_core_hal exercises) -----------------------
+# The vendored STM32WL HAL lives under common/hal/. HAL builds add USE_HAL_DRIVER
+# and a few extra include dirs (HAL Inc + the dir holding stm32wlxx_hal_conf.h).
+HALROOT    := $(COMMON)/hal
+HAL_DRV    := $(HALROOT)/Drivers/STM32WLxx_HAL_Driver
+HAL_GLUE   := $(HALROOT)/hal_glue.c
+HAL_INCLUDES := $(INCLUDES) \
+	-I$(HAL_DRV)/Inc \
+	-I$(HAL_DRV)/Inc/Legacy \
+	-I$(HALROOT)/Inc
+# HAL needs USE_HAL_DRIVER; the M4 cpu/defines are otherwise the same.
+CFLAGS_HAL := $(CPU) $(DEFS) -DUSE_HAL_DRIVER $(HAL_INCLUDES) -Wall -Wextra -O2 -g3 \
+	-ffunction-sections -fdata-sections -MMD -MP
+# The HAL driver sources are warning-noisy under -Wextra and are not the
+# lesson, so compile them without -Wall -Wextra (keep -w quiet).
+CFLAGS_HALDRV := $(CPU) $(DEFS) -DUSE_HAL_DRIVER $(HAL_INCLUDES) -w -O2 -g3 \
+	-ffunction-sections -fdata-sections -MMD -MP
+# Every HAL driver .c (compiled once per exercise into that exercise's .obj).
+HAL_DRV_SRCS := $(wildcard $(HAL_DRV)/Src/*.c)
+
 # Linker lines that are benign on bare metal and should be hidden: the
 # newlib-nano unimplemented-syscall warnings, their context/note lines, and the
 # RWX-segment note. Real errors don't match these and still show.
@@ -88,59 +111,102 @@ libc_nano\.a|in function .(_close_r|_lseek_r|_read_r|_write_r|_sbrk_r|_fstat_r|_
 has a LOAD segment with RWX permissions|warn-rwx-segments
 
 # ---- discovery -------------------------------------------------------------
-# The directory tree IS the classification: everything under singlecore/ builds
-# one M4 image; everything under dualcore/ builds two images (M4 + M0+). A dir
-# must hold the expected source (main.c, or main_cm4.c) to be picked up, so the
-# sourceless RTOS stub is ignored automatically.
-EXERCISES  := $(sort $(patsubst %/,%,$(dir $(wildcard $(SINGLEDIR)/[0-9]*_*/main.c))))
+# The directory tree IS the classification. A single_core/ exercise carries BOTH
+# main_bare.c and main_hal.c and builds two M4 images. A dual_core/ exercise
+# carries main_cm4.c + main_cm0p.c and builds one image per core. Discovery keys
+# off main_bare.c / main_cm4.c, so a sourceless dir (e.g. the RTOS stub) is
+# ignored automatically.
+EXERCISES  := $(sort $(patsubst %/,%,$(dir $(wildcard $(SINGLEDIR)/[0-9]*_*/main_bare.c))))
 dualcore   := $(sort $(patsubst %/,%,$(dir $(wildcard $(DUALDIR)/[0-9]*_*/main_cm4.c))))
-# Bare names (NN_name) used as convenience targets.
 NAMES      := $(notdir $(EXERCISES))
 DUALNAMES  := $(notdir $(dualcore))
 
-# Per-exercise source.
-app-src = $1/main.c
-
-BINS := $(foreach e,$(EXERCISES),$(e)/firmware.bin)
+# Each single-core exercise produces two images: bare-metal and HAL.
+BINS := $(foreach e,$(EXERCISES),$(e)/firmware_bare.bin $(e)/firmware_hal.bin)
 # Each dual-core exercise produces two images: one for the M4, one for the M0+.
 DUALBINS := $(foreach e,$(dualcore),$(e)/firmware_cm4.bin $(e)/firmware_cm0p.bin)
 
 .PHONY: all list clean
 all: $(BINS) $(DUALBINS)
 
-# ---- per-exercise rules (generated, one set per discovered exercise) --------
-# $1 = exercise dir. Objects live in $1/.obj; outputs are $1/{app.elf,firmware.bin}.
-define EXERCISE_rules
-$1/.obj/app.o: $(call app-src,$1) | $1/.obj
-	@echo "  CC    $$<"
+# ---- per-single-core-exercise rules ----------------------------------------
+# $1 = exercise dir under single_core/. Builds TWO M4 images from the same dir:
+#   bare: main_bare.c            -> app_bare.elf / firmware_bare.bin
+#   hal : main_hal.c + full HAL  -> app_hal.elf  / firmware_hal.bin
+# Both share the startup .s and system_stm32wlxx.c. The HAL image also links
+# hal_glue.c (SysTick_Handler -> HAL_IncTick) and the whole HAL driver set;
+# its objects live in $1/.obj/hal/ so they never clash with the bare objects.
+define SINGLECORE_rules
+# --- bare-metal image ---
+$1/.obj/bare.o: $1/main_bare.c | $1/.obj
+	@echo "  CC    $$< (bare)"
 	$$(Q)$$(CC) $$(CFLAGS) -c -o $$@ $$<
 
-$1/.obj/system.o: $$(SYSTEM) | $1/.obj
-	@echo "  CC    $$<"
+$1/.obj/system_bare.o: $$(SYSTEM) | $1/.obj
+	@echo "  CC    $$< (bare)"
 	$$(Q)$$(CC) $$(CFLAGS) -c -o $$@ $$<
 
-$1/.obj/startup.o: $$(STARTUP) | $1/.obj
-	@echo "  AS    $$<"
+$1/.obj/startup_bare.o: $$(STARTUP) | $1/.obj
+	@echo "  AS    $$< (bare)"
 	$$(Q)$$(CC) $$(ASFLAGS) -c -o $$@ $$<
 
-$1/app.elf: $1/.obj/app.o $1/.obj/system.o $1/.obj/startup.o $$(LDSCRIPT)
+$1/app_bare.elf: $1/.obj/bare.o $1/.obj/system_bare.o $1/.obj/startup_bare.o $$(LDSCRIPT)
 	@echo "  LD    $$@"
-	$$(Q)$$(CC) $$(LDFLAGS) -Wl,-Map=$1/app.map -o $$@ $$(filter %.o,$$^) 2>&1 \
+	$$(Q)$$(CC) $$(LDFLAGS) -Wl,-Map=$1/app_bare.map -o $$@ $$(filter %.o,$$^) 2>&1 \
 		| grep -vE '$$(LD_NOISE)' || true
 	$$(Q)test -f $$@
 
-$1/firmware.bin: $1/app.elf
+$1/firmware_bare.bin: $1/app_bare.elf
 	@echo "  BIN   $$@"
 	$$(Q)$$(OBJCOPY) -O binary $$< $$@
 	$$(Q)$$(SIZE) $$<
-	@echo "  built $1"
+
+# --- HAL image ---
+$1/.obj/hal_app.o: $1/main_hal.c | $1/.obj
+	@echo "  CC    $$< (hal)"
+	$$(Q)$$(CC) $$(CFLAGS_HAL) -c -o $$@ $$<
+
+$1/.obj/hal_glue.o: $$(HAL_GLUE) | $1/.obj
+	@echo "  CC    $$< (hal)"
+	$$(Q)$$(CC) $$(CFLAGS_HAL) -c -o $$@ $$<
+
+$1/.obj/system_hal.o: $$(SYSTEM) | $1/.obj
+	@echo "  CC    $$< (hal)"
+	$$(Q)$$(CC) $$(CFLAGS_HAL) -c -o $$@ $$<
+
+$1/.obj/startup_hal.o: $$(STARTUP) | $1/.obj
+	@echo "  AS    $$< (hal)"
+	$$(Q)$$(CC) $$(ASFLAGS) -c -o $$@ $$<
+
+# One object per HAL driver source, built quietly into $1/.obj/hal/.
+$1/.obj/hal/%.o: $$(HAL_DRV)/Src/%.c | $1/.obj/hal
+	@echo "  CC    $$< (hal-drv)"
+	$$(Q)$$(CC) $$(CFLAGS_HALDRV) -c -o $$@ $$<
+
+$1_HALOBJS := $$(patsubst $$(HAL_DRV)/Src/%.c,$1/.obj/hal/%.o,$$(HAL_DRV_SRCS))
+
+$1/app_hal.elf: $1/.obj/hal_app.o $1/.obj/hal_glue.o $1/.obj/system_hal.o $1/.obj/startup_hal.o $$($1_HALOBJS) $$(LDSCRIPT)
+	@echo "  LD    $$@"
+	$$(Q)$$(CC) $$(LDFLAGS) -Wl,-Map=$1/app_hal.map -o $$@ $$(filter %.o,$$^) 2>&1 \
+		| grep -vE '$$(LD_NOISE)' || true
+	$$(Q)test -f $$@
+
+$1/firmware_hal.bin: $1/app_hal.elf
+	@echo "  BIN   $$@"
+	$$(Q)$$(OBJCOPY) -O binary $$< $$@
+	$$(Q)$$(SIZE) $$<
+	@echo "  built $1 (bare + HAL)"
 
 $1/.obj:
 	$$(Q)mkdir -p $$@
+$1/.obj/hal:
+	$$(Q)mkdir -p $$@
 
--include $1/.obj/app.d $1/.obj/system.d $1/.obj/startup.d
+-include $1/.obj/bare.d $1/.obj/system_bare.d $1/.obj/startup_bare.d
+-include $1/.obj/hal_app.d $1/.obj/hal_glue.d $1/.obj/system_hal.d $1/.obj/startup_hal.d
+-include $1/.obj/hal/*.d
 endef
-$(foreach e,$(EXERCISES),$(eval $(call EXERCISE_rules,$e)))
+$(foreach e,$(EXERCISES),$(eval $(call SINGLECORE_rules,$e)))
 
 # ---- per-dual-core-exercise rules ------------------------------------------
 # $1 = exercise dir. Builds two independent images that DON'T overlap in flash:
@@ -207,21 +273,25 @@ $1/.obj:
 endef
 $(foreach e,$(dualcore),$(eval $(call DUALCORE_rules,$e)))
 
-# Convenience targets so you can build by bare name (e.g. `make 02_serial_counter`)
-# or by full path (`make exercises/singlecore/02_serial_counter`).
-$(NAMES): %: $(SINGLEDIR)/%/firmware.bin
-$(EXERCISES): %: %/firmware.bin
-# Dual-core bare-name / full-path targets build BOTH images.
+# Convenience targets. A single-core bare name (e.g. `make 02_serial_counter`)
+# builds BOTH that exercise's images (bare + HAL). Full-path targets also work.
+$(NAMES): %: $(SINGLEDIR)/%/firmware_bare.bin $(SINGLEDIR)/%/firmware_hal.bin
+$(EXERCISES): %: %/firmware_bare.bin %/firmware_hal.bin
+# Dual-core bare-name / full-path targets build BOTH core images.
 $(DUALNAMES): %: $(DUALDIR)/%/firmware_cm4.bin $(DUALDIR)/%/firmware_cm0p.bin
 $(dualcore): %: %/firmware_cm4.bin %/firmware_cm0p.bin
 .PHONY: $(NAMES) $(EXERCISES) $(DUALNAMES) $(dualcore)
 
 list:
+	@echo "single_core (each builds bare + HAL):"
 	@for e in $(NAMES); do echo "  $$e"; done
-	@for e in $(DUALNAMES); do echo "  $$e (dual-core: M4 + M0+)"; done
+	@echo "dual_core (M4 + M0+):"
+	@for e in $(DUALNAMES); do echo "  $$e"; done
 
 clean:
 	$(Q)rm -rf $(SINGLEDIR)/*/.obj $(DUALDIR)/*/.obj
+	$(Q)rm -f $(SINGLEDIR)/*/app_bare.elf $(SINGLEDIR)/*/firmware_bare.bin $(SINGLEDIR)/*/app_bare.map
+	$(Q)rm -f $(SINGLEDIR)/*/app_hal.elf $(SINGLEDIR)/*/firmware_hal.bin $(SINGLEDIR)/*/app_hal.map
 	$(Q)rm -f $(SINGLEDIR)/*/app.elf $(SINGLEDIR)/*/firmware.bin $(SINGLEDIR)/*/app.map
 	$(Q)rm -f $(DUALDIR)/*/app_cm4.elf $(DUALDIR)/*/firmware_cm4.bin $(DUALDIR)/*/app_cm4.map
 	$(Q)rm -f $(DUALDIR)/*/app_cm0p.elf $(DUALDIR)/*/firmware_cm0p.bin $(DUALDIR)/*/app_cm0p.map

@@ -95,5 +95,5 @@ So on this board:
 
 B1 is **PA0** (the factory SB16/SB15 default), not PC13. All three are
 active-low: enable an internal **pull-up**, and a press reads **LOW** / triggers
-a **falling** edge. The button exercises (`04_push_buttons`, `05_interrupts`) are
+a **falling** edge. The button exercises (`04_buttons_and_leds`, `05_interrupts`) are
 configured accordingly.

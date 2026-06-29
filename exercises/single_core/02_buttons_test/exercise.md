@@ -4,7 +4,7 @@ Monitor all of the board's user buttons at once and print, over the serial port,
 every time one changes state — reporting the actual pin level. This is both a
 GPIO-input exercise and a practical diagnostic: it tells you *which* MCU pin a
 given physical button is wired to, and whether it reads HIGH or LOW when pressed.
-That mapping is needed by the later button exercises (`04_push_buttons`,
+That mapping is needed by the later button exercises (`04_buttons_and_leds`,
 `05_interrupts`).
 
 The NUCLEO-WL55JC user buttons (per UM2592) are:
