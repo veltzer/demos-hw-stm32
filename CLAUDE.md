@@ -73,11 +73,13 @@ Commands:
 
 ## Flashing
 
-    scripts/build_exercise.sh <name>   # build one exercise (by bare name)
-    scripts/build_all.sh               # build all (make -k)
-    scripts/flash_exercise.sh <name>   # build + flash a single-core exercise
-                                       #   (STM32_Programmer_CLI, connect-under-reset)
-    scripts/flash_menu.sh              # TUI: pick an exercise, build + flash
+Build first with `make` (above); the flash scripts only flash, never build.
+
+    scripts/flash_exercise.sh <name> [bare|hal]  # flash a pre-built single-core
+                                                 #   exercise (default: bare)
+                                                 #   via STM32_Programmer_CLI,
+                                                 #   connect-under-reset
+    scripts/flash_menu.sh                        # TUI: pick exercise + variant
 
 Only single-core exercises are flashable; dual-core ones build two images but
 need option bytes to run, so the flash scripts refuse them with a message.

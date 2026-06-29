@@ -1,12 +1,12 @@
 #!/bin/bash -eu
-# Interactive TUI to pick an exercise and flash it to the board.
-# Shows every exercise; dual-core and sourceless ones are marked unsupported
-# and cannot be selected. The chosen exercise is built (via the Makefile) and
-# flashed with st-flash.
+# Interactive TUI to pick a single-core exercise (and bare-metal vs HAL variant)
+# and flash it to the board. Dual-core exercises are shown but not selectable
+# (they need option bytes to run). Flashes a PRE-BUILT image via flash_exercise.sh
+# (run `make` first); this menu does not build.
 
 HERE="$(dirname "$0")/.."
-SINGLEDIR="$HERE/exercises/singlecore"
-DUALDIR="$HERE/exercises/dualcore"
+SINGLEDIR="$HERE/exercises/single_core"
+DUALDIR="$HERE/exercises/dual_core"
 
 # pick a menu backend
 if command -v whiptail >/dev/null 2>&1; then
@@ -20,15 +20,16 @@ else
 fi
 
 # Build the menu by scanning both exercise trees. The directory is the
-# classification: singlecore/ exercises are flashable; dualcore/ ones build two
-# images and need option bytes to run, so they're shown but not selectable.
+# classification: single_core/ exercises are flashable; dual_core/ ones build
+# two core images and need option bytes to run, so they're shown but not
+# selectable.
 items=()        # tag + description pairs for the menu
 declare -A buildable=()
 for dir in "$SINGLEDIR"/[0-9]*_*/; do
 	[ -d "$dir" ] || continue
 	name="$(basename "$dir")"
-	if [ -f "$dir/main.c" ]; then
-		items+=("$name" "single-core")
+	if [ -f "$dir/main_bare.c" ]; then
+		items+=("$name" "single-core (bare + HAL)")
 		buildable["$name"]=1
 	else
 		items+=("$name" "(no source - unsupported)")
@@ -61,5 +62,15 @@ if [ -z "${buildable[$choice]:-}" ]; then
 	exit 1
 fi
 
-echo "==> building and flashing $choice"
-exec "$HERE/scripts/flash_exercise.sh" "$choice"
+# Second menu: bare-metal vs HAL solution for the chosen exercise.
+variant="$("$MENU" --title "Which solution?" \
+	--menu "Build '$choice' as:" \
+	12 60 2 \
+	bare "register-level (bare metal)" \
+	hal  "using the STM32 HAL" \
+	3>&1 1>&2 2>&3)" || { echo "cancelled."; exit 0; }
+
+[ -n "$variant" ] || { echo "cancelled."; exit 0; }
+
+echo "==> flashing $choice ($variant)"
+exec "$HERE/scripts/flash_exercise.sh" "$choice" "$variant"
