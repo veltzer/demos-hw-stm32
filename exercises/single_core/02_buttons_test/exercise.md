@@ -9,11 +9,11 @@ That mapping is needed by the later button exercises (`04_buttons_and_leds`,
 
 The NUCLEO-WL55JC user buttons (per UM2592) are:
 
-| Button | Pin(s)                          |
-| ------ | ------------------------------- |
-| B1     | PA0 (default) or PC13 (alt)     |
-| B2     | PA1                             |
-| B3     | PC6                             |
+| Button | Pin                                   |
+| ------ | ------------------------------------- |
+| B1     | PA0 (confirmed on this board; active-low) |
+| B2     | PA1                                   |
+| B3     | PC6                                   |
 
 (B4/RESET is NRST and is not a GPIO input — see `doc/board_buttons.md` for the
 physical layout and which button is which.)
@@ -40,3 +40,14 @@ Press each button in turn; you'll see lines such as:
 
 The pin that reacts is the one that button is wired to, and HIGH-vs-LOW tells you
 its active level.
+
+## Two solutions: bare-metal and HAL
+
+This exercise is solved two ways, both in this folder:
+
+- `main_bare.c` — bare metal: configure and drive the peripheral registers directly.
+- `main_hal.c` — the same behaviour using ST's HAL (`HAL_*` calls).
+
+Build both images with `make 02_buttons_test`. Flash one with
+`scripts/flash_exercise.sh 02_buttons_test bare` (or `hal`). Comparing the two shows what
+the HAL does for you — and what it hides.
