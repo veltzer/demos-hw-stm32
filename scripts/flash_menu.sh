@@ -1,11 +1,12 @@
 #!/bin/bash -eu
-# Interactive TUI to pick a single-core exercise (and bare-metal vs HAL variant)
-# and flash it to the board. Dual-core exercises are shown but not selectable
-# (they need option bytes to run). Flashes a PRE-BUILT image via flash_exercise.sh
-# (run `make` first); this menu does not build.
+# Interactive TUI to pick an exercise (and bare-metal vs HAL variant) and flash
+# it to the board. Both single- and dual-core exercises are offered; dual-core
+# flashes both cores. Flashes a PRE-BUILT image via flash_exercise.sh (run `make`
+# first); this menu does not build.
 
 HERE="$(dirname "$0")/.."
 SINGLEDIR="$HERE/exercises/single_core"
+DUALDIR="$HERE/exercises/dual_core"
 
 # pick a menu backend
 if command -v whiptail >/dev/null 2>&1; then
@@ -18,16 +19,20 @@ else
 	exit 1
 fi
 
-# Every single-core exercise has both a bare and a HAL solution, so they are all
-# flashable. (Dual-core exercises need option bytes to run and are not offered.)
+# Every exercise has both a bare and a HAL solution, so all are flashable.
+# Dual-core entries flash both cores (handled by flash_exercise.sh).
 items=()        # tag + description pairs for the menu
 for dir in "$SINGLEDIR"/[0-9]*_*/; do
-	[ -d "$dir" ] || continue
+	[ -f "$dir/main_bare.c" ] || continue
 	items+=("$(basename "$dir")" "single-core (bare + HAL)")
+done
+for dir in "$DUALDIR"/[0-9]*_*/; do
+	[ -f "$dir/main_cm4_bare.c" ] || continue
+	items+=("$(basename "$dir")" "dual-core, both cores (bare + HAL)")
 done
 
 if [ "${#items[@]}" -eq 0 ]; then
-	echo "error: no exercises found under $SINGLEDIR" >&2
+	echo "error: no exercises found under $SINGLEDIR or $DUALDIR" >&2
 	exit 1
 fi
 
