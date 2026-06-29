@@ -63,5 +63,5 @@ the clone: it is configuration, not a driver.
 
 To use a HAL peripheral not currently enabled (say `TIM`), add
 `#define HAL_TIM_MODULE_ENABLED` here — the driver source is already present in
-the clone and will start compiling into the shared `libhal.a`. No other build
+the clone and will start compiling into the shared `libhal_cm4.a`. No other build
 changes are needed.

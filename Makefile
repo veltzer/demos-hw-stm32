@@ -167,8 +167,8 @@ DUALBINS := $(foreach e,$(dualcore),$(call dual-bins,$e))
 all: $(BINS) $(DUALBINS)
 
 # ---- shared HAL library ----------------------------------------------------
-# Compile the HAL driver set ONCE into common/hal/libhal.a; every HAL app links
-# against it (the linker's --gc-sections then keeps only what each app uses).
+# Compile the HAL driver set ONCE (per core) into common/libhal_<cpu>.a; every
+# HAL app links it (the linker's --gc-sections then keeps only what it uses).
 $(HAL_LIBDIR)/%.o: $(HAL_DRV)/Src/%.c | $(HAL_LIBDIR)
 	@echo "  CC    $< (hal-lib)"
 	$(Q)$(CC) $(CFLAGS_HALDRV) -c -o $@ $<
@@ -199,7 +199,7 @@ $(HAL_LIB_CM0): $(HAL_LIBOBJS_CM0)
 # ---- per-single-core-exercise rules ----------------------------------------
 # $1 = exercise dir under single_core/. Builds TWO M4 images from the same dir:
 #   bare: main_bare.c            -> app_bare.elf / firmware_bare.bin
-#   hal : main_hal.c + libhal.a  -> app_hal.elf  / firmware_hal.bin
+#   hal : main_hal.c + libhal_cm4.a -> app_hal.elf / firmware_hal.bin
 # Both share the startup .s and system_stm32wlxx.c. The HAL image also links the
 # shared HAL library; each main_hal.c provides its own SysTick_Handler.
 define SINGLECORE_rules

@@ -7,9 +7,9 @@
 /exercises/*/*/.obj/
 # shared HAL libraries, compiled once from the STM32CubeWL HAL driver set
 # (one per core: M4 and M0+)
-/exercises/common/.hal_obj/
+/exercises/common/.hal_obj_cm4/
 /exercises/common/.hal_obj_cm0/
-/exercises/common/libhal.a
+/exercises/common/libhal_cm4.a
 /exercises/common/libhal_cm0.a
 # STM32CubeWL firmware package (HAL/LL/CMSIS), cloned by scripts/clone_cubewl.sh
 # into the repo root. External vendor source, never committed.
