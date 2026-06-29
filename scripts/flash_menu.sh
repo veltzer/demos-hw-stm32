@@ -6,7 +6,6 @@
 
 HERE="$(dirname "$0")/.."
 SINGLEDIR="$HERE/exercises/single_core"
-DUALDIR="$HERE/exercises/dual_core"
 
 # pick a menu backend
 if command -v whiptail >/dev/null 2>&1; then
