@@ -26,21 +26,26 @@ with the proprietary STM32CubeIDE install, so it is not in `install_deps.sh`.
 When adding a tool to any script or the Makefile, add its package to
 `scripts/install_deps.sh`.
 
-### STM32CubeWL HAL package (for the HAL exercises)
+### STM32CubeWL package (required for ALL builds)
 
-The HAL solutions build against ST's full **STM32CubeWL** firmware package (the
-complete HAL/LL/CMSIS, including drivers the CubeIDE blink project never
-generates, e.g. IPCC and HSEM). It is **not vendored in-repo** -- to avoid
-duplication it is cloned into the repo root as `STM32CubeWL/` (gitignored):
+Both the HAL drivers and the CMSIS headers come from ST's full **STM32CubeWL**
+firmware package. It is **not vendored in-repo** -- to avoid duplication it is
+cloned into the repo root as `STM32CubeWL/` (gitignored):
 
     scripts/clone_cubewl.sh        # clone STM32CubeWL + needed submodules
 
-The Makefile points the HAL build at `STM32CubeWL/` (override with
-`make CUBEWL=/path/to/STM32CubeWL`). Only our project config
-(`exercises/common/hal_config/stm32wlxx_hal_conf.h`, which selects the enabled
-HAL modules) and the SysTick glue (`hal_glue.c`) live in the repo. If the clone
-is missing, `make` warns and the HAL exercises won't build (the bare-metal ones,
-which use the self-contained `exercises/common/CMSIS`, still build).
+So this clone is now a build prerequisite for **every** exercise (bare-metal and
+HAL). If it is missing, `make` warns (pointing at `clone_cubewl.sh`) and the
+compile fails on a missing `stm32wl55xx.h`. Override the location with
+`make CUBEWL=/path/to/STM32CubeWL`.
+
+What stays in the repo (`exercises/common/`) is only what is genuinely *ours*:
+the customized startup (`startup_stm32wl55jcix*.s`), linker scripts (the M4 one
+uses 128K bank 1 so the M0+ image fits in bank 2), `system_stm32wlxx.c`, and the
+HAL config (`hal_config/stm32wlxx_hal_conf.h`). CMSIS and the HAL drivers are
+taken from the clone (its versions are newer than the previously-vendored
+copies). Each `main_hal.c` defines its own `SysTick_Handler` (forwarding to
+`HAL_IncTick`), so HAL_Delay/HAL_GetTick work without any shared glue file.
 
 ## Build system
 

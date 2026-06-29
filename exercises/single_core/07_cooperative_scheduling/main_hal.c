@@ -5,6 +5,9 @@
 // (HAL_Init() starts the SysTick that increments it).
 #include "stm32wlxx_hal.h"
 
+// HAL_GetTick() reads the millisecond counter this interrupt increments.
+void SysTick_Handler(void) { HAL_IncTick(); }
+
 // --- Task 1: blink LD1 (blue, PB15) slowly (every 500 ms) ---
 static void task1_blink_slow(void) {
     static uint32_t last = 0;

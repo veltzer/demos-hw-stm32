@@ -2,6 +2,9 @@
 // is held. Compare with main_bare.c.
 #include "stm32wlxx_hal.h"
 
+// Service the 1 ms tick HAL_Init() starts (keeps HAL_GetTick/HAL_Delay working).
+void SysTick_Handler(void) { HAL_IncTick(); }
+
 int main(void) {
     HAL_Init();
     __HAL_RCC_GPIOA_CLK_ENABLE();

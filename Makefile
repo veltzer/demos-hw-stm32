@@ -45,12 +45,14 @@ DEFS    := -DSTM32WL55xx -DCORE_CM4
 #                                    (same lesson via the HAL); each builds its
 #                                    own M4 image (firmware_bare.bin / _hal.bin).
 #   exercises/dual_core/NN_name/   - main_cm4.c + main_cm0p.c, one image per core.
-# with shared CMSIS/startup/linker support in exercises/common/ (and the vendored
-# STM32WL HAL under exercises/common/hal/).
+# Our customized startup/linker/system live in exercises/common/; the vendor
+# CMSIS and HAL come from the STM32CubeWL clone (gitignored, see CUBEWL below).
 DIR     := exercises
 SINGLEDIR := $(DIR)/single_core
 DUALDIR   := $(DIR)/dual_core
 COMMON  := $(DIR)/common
+# STM32CubeWL package (cloned by scripts/clone_cubewl.sh). Override to relocate.
+CUBEWL  ?= STM32CubeWL
 LDSCRIPT := $(COMMON)/STM32WL55JCIX_FLASH.ld
 STARTUP  := $(COMMON)/startup_stm32wl55jcix.s
 SYSTEM   := $(COMMON)/system_stm32wlxx.c
@@ -63,9 +65,13 @@ DEFS_CM0  := -DSTM32WL55xx -DCORE_CM0PLUS
 LDSCRIPT_CM0 := $(COMMON)/STM32WL55JCIX_FLASH_CM0PLUS.ld
 STARTUP_CM0  := $(COMMON)/startup_stm32wl55jcix_cm0plus.s
 
+# CMSIS (ARM core + ST device headers) comes from the STM32CubeWL clone -- it is
+# pure vendor source, identical in kind to what we used to vendor, so it is not
+# duplicated in-repo. (Our customized startup/linker/system DO stay in common/.)
+CMSIS_INC := $(CUBEWL)/Drivers/CMSIS
 INCLUDES := \
-	-I$(COMMON)/CMSIS/Include \
-	-I$(COMMON)/CMSIS/Device/ST/STM32WLxx/Include
+	-I$(CMSIS_INC)/Include \
+	-I$(CMSIS_INC)/Device/ST/STM32WLxx/Include
 
 # ---- flags -----------------------------------------------------------------
 # -MMD -MP emit per-object header-dependency files for incremental rebuilds.
@@ -85,13 +91,11 @@ LDFLAGS_CM0 := $(CPU_CM0) -T$(LDSCRIPT_CM0) -Wl,--gc-sections \
 # ---- HAL support (for the single_core_hal exercises) -----------------------
 # The full STM32WL HAL/LL/CMSIS comes from the STM32CubeWL package cloned into
 # the repo root by scripts/clone_cubewl.sh (gitignored -- NOT vendored in-repo,
-# so no duplication). Only our project config (stm32wlxx_hal_conf.h) and the
-# glue (hal_glue.c) live in the repo, under common/hal_config/.
-# Override CUBEWL on the command line to point elsewhere.
-CUBEWL     ?= STM32CubeWL
+# so no duplication). Only our project config (stm32wlxx_hal_conf.h) lives in the
+# repo, under common/hal_config/. (Each main_hal.c defines its own
+# SysTick_Handler.) CUBEWL is defined near the top with the CMSIS includes.
 HAL_DRV    := $(CUBEWL)/Drivers/STM32WLxx_HAL_Driver
 HAL_CFGDIR := $(COMMON)/hal_config
-HAL_GLUE   := $(HAL_CFGDIR)/hal_glue.c
 HAL_INCLUDES := $(INCLUDES) \
 	-I$(HAL_DRV)/Inc \
 	-I$(HAL_DRV)/Inc/Legacy \
@@ -113,9 +117,10 @@ HAL_LIBOBJS  := $(patsubst $(HAL_DRV)/Src/%.c,$(HAL_LIBDIR)/%.o,$(HAL_DRV_SRCS))
 HAL_LIB      := $(COMMON)/libhal.a
 AR           := $(PREFIX)ar
 
-# Fail early with a clear message if the HAL package hasn't been cloned.
+# Warn early with a clear message if the STM32CubeWL clone is missing. Both the
+# HAL (drivers) and the bare-metal exercises (CMSIS headers) need it now.
 ifeq ($(wildcard $(HAL_DRV)/Src/stm32wlxx_hal_ipcc.c),)
-$(warning STM32CubeWL not found at '$(CUBEWL)'. HAL exercises will not build.)
+$(warning STM32CubeWL not found at '$(CUBEWL)'. No exercises will build.)
 $(warning Run: scripts/clone_cubewl.sh   (or set CUBEWL=/path/to/STM32CubeWL))
 endif
 
@@ -166,8 +171,8 @@ $(HAL_LIB): $(HAL_LIBOBJS)
 # $1 = exercise dir under single_core/. Builds TWO M4 images from the same dir:
 #   bare: main_bare.c            -> app_bare.elf / firmware_bare.bin
 #   hal : main_hal.c + libhal.a  -> app_hal.elf  / firmware_hal.bin
-# Both share the startup .s and system_stm32wlxx.c. The HAL image also links
-# hal_glue.c (SysTick_Handler -> HAL_IncTick) and the shared HAL library.
+# Both share the startup .s and system_stm32wlxx.c. The HAL image also links the
+# shared HAL library; each main_hal.c provides its own SysTick_Handler.
 define SINGLECORE_rules
 # --- bare-metal image ---
 $1/.obj/bare.o: $1/main_bare.c | $1/.obj
@@ -193,12 +198,8 @@ $1/firmware_bare.bin: $1/app_bare.elf
 	$$(Q)$$(OBJCOPY) -O binary $$< $$@
 	$$(Q)$$(SIZE) $$<
 
-# --- HAL image ---
+# --- HAL image (each main_hal.c defines its own SysTick_Handler) ---
 $1/.obj/hal_app.o: $1/main_hal.c | $1/.obj
-	@echo "  CC    $$< (hal)"
-	$$(Q)$$(CC) $$(CFLAGS_HAL) -c -o $$@ $$<
-
-$1/.obj/hal_glue.o: $$(HAL_GLUE) | $1/.obj
 	@echo "  CC    $$< (hal)"
 	$$(Q)$$(CC) $$(CFLAGS_HAL) -c -o $$@ $$<
 
@@ -211,10 +212,10 @@ $1/.obj/startup_hal.o: $$(STARTUP) | $1/.obj
 	$$(Q)$$(CC) $$(ASFLAGS) -c -o $$@ $$<
 
 # Link against the shared HAL library (built once); --gc-sections drops unused.
-$1/app_hal.elf: $1/.obj/hal_app.o $1/.obj/hal_glue.o $1/.obj/system_hal.o $1/.obj/startup_hal.o $$(HAL_LIB) $$(LDSCRIPT)
+$1/app_hal.elf: $1/.obj/hal_app.o $1/.obj/system_hal.o $1/.obj/startup_hal.o $$(HAL_LIB) $$(LDSCRIPT)
 	@echo "  LD    $$@"
 	$$(Q)$$(CC) $$(LDFLAGS) -Wl,-Map=$1/app_hal.map -o $$@ \
-		$1/.obj/hal_app.o $1/.obj/hal_glue.o $1/.obj/system_hal.o $1/.obj/startup_hal.o $$(HAL_LIB) 2>&1 \
+		$1/.obj/hal_app.o $1/.obj/system_hal.o $1/.obj/startup_hal.o $$(HAL_LIB) 2>&1 \
 		| grep -vE '$$(LD_NOISE)' || true
 	$$(Q)test -f $$@
 
@@ -228,7 +229,7 @@ $1/.obj:
 	$$(Q)mkdir -p $$@
 
 -include $1/.obj/bare.d $1/.obj/system_bare.d $1/.obj/startup_bare.d
--include $1/.obj/hal_app.d $1/.obj/hal_glue.d $1/.obj/system_hal.d $1/.obj/startup_hal.d
+-include $1/.obj/hal_app.d $1/.obj/system_hal.d $1/.obj/startup_hal.d
 endef
 $(foreach e,$(EXERCISES),$(eval $(call SINGLECORE_rules,$e)))
 

@@ -7,6 +7,9 @@
 // HAL_GPIO_EXTI_Callback() which we override below.
 #include "stm32wlxx_hal.h"
 
+// Service the 1 ms tick HAL_Init() starts (keeps HAL_GetTick/HAL_Delay working).
+void SysTick_Handler(void) { HAL_IncTick(); }
+
 void EXTI0_IRQHandler(void) {
     HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_0); // clears the pending bit, then calls back
 }

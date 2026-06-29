@@ -1,10 +1,9 @@
 // 08_preemption, HAL version (conceptual). Preemptive context switching is
 // inherently low-level -- there is no HAL API that saves/restores CPU registers
 // -- so the real work still lives in a PendSV assembly handler, exactly as in
-// main_bare.c. What the HAL gives us here is the periodic tick: instead of
-// hand-configuring SysTick, we let HAL_Init() run the 1 ms SysTick and hook
-// HAL_SYSTICK_Callback() (called from HAL_IncTick path via SysTick_Handler in
-// hal_glue.c) to pend the context switch.
+// main_bare.c. What the HAL gives us here is the periodic tick: HAL_Init() runs
+// the 1 ms SysTick, and our SysTick_Handler both services the HAL tick and pends
+// the context switch.
 //
 // NOTE: kept a stub on purpose. A working scheduler needs per-task stacks, TCBs
 // and the PendSV register save/restore -- that is the exercise.
@@ -13,9 +12,10 @@
 void task1_function(void) { while (1) { /* blink LD1 */ } }
 void task2_function(void) { while (1) { /* blink LD2 */ } }
 
-// HAL calls this from its SysTick handling once per millisecond. We use it to
-// request a context switch by pending the (lower-priority) PendSV exception.
-void HAL_SYSTICK_Callback(void) {
+// Runs every millisecond: keep the HAL tick alive, then request a context switch
+// by pending the (lower-priority) PendSV exception.
+void SysTick_Handler(void) {
+    HAL_IncTick();
     SCB->ICSR |= SCB_ICSR_PENDSVSET_Msk;
 }
 

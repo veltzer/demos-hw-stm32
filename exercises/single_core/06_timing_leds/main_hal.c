@@ -7,6 +7,9 @@
 // driver; SysTick-based timing is the idiomatic HAL approach for this anyway.)
 #include "stm32wlxx_hal.h"
 
+// HAL_Delay() counts milliseconds off this interrupt; without it HAL_Delay hangs.
+void SysTick_Handler(void) { HAL_IncTick(); }
+
 int main(void) {
     HAL_Init();
     __HAL_RCC_GPIOB_CLK_ENABLE();

@@ -2,6 +2,9 @@
 // (LD1=PB15, LD2=PB9, LD3=PB11). Compare with main_bare.c.
 #include "stm32wlxx_hal.h"
 
+// HAL_Delay() counts milliseconds off this interrupt; without it HAL_Delay hangs.
+void SysTick_Handler(void) { HAL_IncTick(); }
+
 int main(void) {
     HAL_Init();
     __HAL_RCC_GPIOB_CLK_ENABLE();

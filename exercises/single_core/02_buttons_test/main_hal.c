@@ -6,6 +6,9 @@
 #include "stm32wlxx_hal.h"
 #include <string.h>
 
+// HAL_Delay() counts milliseconds off this interrupt; without it HAL_Delay hangs.
+void SysTick_Handler(void) { HAL_IncTick(); }
+
 static UART_HandleTypeDef lpuart1;
 
 static void uart_init(void) {

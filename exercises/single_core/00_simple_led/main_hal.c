@@ -6,6 +6,9 @@
 // pin with a GPIO_InitTypeDef, and use HAL_GPIO_* + HAL_Delay() helpers.
 #include "stm32wlxx_hal.h"
 
+// HAL_Delay() counts milliseconds off this interrupt; without it HAL_Delay hangs.
+void SysTick_Handler(void) { HAL_IncTick(); }
+
 int main(void) {
     HAL_Init(); // configures SysTick (1 ms tick) and the NVIC priority grouping
 
