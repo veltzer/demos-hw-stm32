@@ -73,7 +73,27 @@ Likely a USB power-integrity glitch on the ST-LINK. Things to try (hardware):
 a better/shorter USB cable, a powered USB hub, a different (rear) USB port, and
 checking the board's power-source jumper.
 
-**Consequence:** the exact pin↔button mapping has NOT been confirmed on hardware
-yet. `02_buttons_test` (which prints each pin's level over UART) is the tool to
-confirm it once the VCP stops dropping; until then, treat the PA0/PA1/PC6 vs
-PC13 question as open.
+A **different USB cable fixed it** — the VCP stopped dropping, and the mapping is
+now confirmed (see below). So if button presses bounce the serial port, suspect
+the cable/port first.
+
+## Confirmed button mapping (via 02_buttons_test)
+
+With a good cable, `02_buttons_test` printed, on press/release:
+
+    B1 (PA0)  LOW / HIGH
+    B2 (PA1)  LOW / HIGH
+    B3 (PC6)  LOW / HIGH
+
+So on this board:
+
+| Button | Pin  | Active level                         |
+| ------ | ---- | ------------------------------------ |
+| B1     | PA0  | active-LOW (idle high, press = low)  |
+| B2     | PA1  | active-LOW                           |
+| B3     | PC6  | active-LOW                           |
+
+B1 is **PA0** (the factory SB16/SB15 default), not PC13. All three are
+active-low: enable an internal **pull-up**, and a press reads **LOW** / triggers
+a **falling** edge. The button exercises (`04_push_buttons`, `05_interrupts`) are
+configured accordingly.

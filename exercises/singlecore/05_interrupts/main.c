@@ -21,19 +21,20 @@ int main(void) {
     GPIOB->MODER &= ~GPIO_MODER_MODE15_1;
     GPIOB->MODER |= GPIO_MODER_MODE15_0;
 
-    // Configure PA0 (B1) as input. B1 is ACTIVE-HIGH on this board (pressed =
-    // high), so use a pull-DOWN to keep the released state at a clean low.
+    // Configure PA0 (B1) as input. B1 is ACTIVE-LOW (confirmed via
+    // 02_buttons_test): idles high, pulled to ground when pressed. Enable the
+    // internal pull-up so the released state is a clean high.
     GPIOA->MODER &= ~GPIO_MODER_MODE0;
     GPIOA->PUPDR &= ~GPIO_PUPDR_PUPD0;
-    GPIOA->PUPDR |= GPIO_PUPDR_PUPD0_1;
+    GPIOA->PUPDR |= GPIO_PUPDR_PUPD0_0;
 
     // Connect EXTI Line 0 to PA0
     SYSCFG->EXTICR[0] &= ~SYSCFG_EXTICR1_EXTI0; // Clear and set to PA0
 
-    // Trigger on the RISING edge: the press takes PA0 from low to high.
+    // Trigger on the FALLING edge: the press takes PA0 from high to low.
     EXTI->IMR1 |= EXTI_IMR1_IM0;
-    EXTI->FTSR1 &= ~EXTI_FTSR1_FT0;
-    EXTI->RTSR1 |= EXTI_RTSR1_RT0;
+    EXTI->RTSR1 &= ~EXTI_RTSR1_RT0;
+    EXTI->FTSR1 |= EXTI_FTSR1_FT0;
 
     // Enable EXTI0 interrupt in NVIC
     NVIC_SetPriority(EXTI0_IRQn, 0);
