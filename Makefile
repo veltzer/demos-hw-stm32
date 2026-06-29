@@ -99,8 +99,13 @@ CFLAGS_HAL := $(CPU) $(DEFS) -DUSE_HAL_DRIVER $(HAL_INCLUDES) -Wall -Wextra -O2 
 # lesson, so compile them without -Wall -Wextra (keep -w quiet).
 CFLAGS_HALDRV := $(CPU) $(DEFS) -DUSE_HAL_DRIVER $(HAL_INCLUDES) -w -O2 -g3 \
 	-ffunction-sections -fdata-sections -MMD -MP
-# Every HAL driver .c (compiled once per exercise into that exercise's .obj).
+# The HAL driver set is compiled ONCE into a shared static library and every HAL
+# app links against it (--gc-sections then drops the unused parts per app).
 HAL_DRV_SRCS := $(wildcard $(HAL_DRV)/Src/*.c)
+HAL_LIBDIR   := $(HALROOT)/.obj
+HAL_LIBOBJS  := $(patsubst $(HAL_DRV)/Src/%.c,$(HAL_LIBDIR)/%.o,$(HAL_DRV_SRCS))
+HAL_LIB      := $(HALROOT)/libhal.a
+AR           := $(PREFIX)ar
 
 # Linker lines that are benign on bare metal and should be hidden: the
 # newlib-nano unimplemented-syscall warnings, their context/note lines, and the
@@ -129,13 +134,28 @@ DUALBINS := $(foreach e,$(dualcore),$(e)/firmware_cm4.bin $(e)/firmware_cm0p.bin
 .PHONY: all list clean
 all: $(BINS) $(DUALBINS)
 
+# ---- shared HAL library ----------------------------------------------------
+# Compile the HAL driver set ONCE into common/hal/libhal.a; every HAL app links
+# against it (the linker's --gc-sections then keeps only what each app uses).
+$(HAL_LIBDIR)/%.o: $(HAL_DRV)/Src/%.c | $(HAL_LIBDIR)
+	@echo "  CC    $< (hal-lib)"
+	$(Q)$(CC) $(CFLAGS_HALDRV) -c -o $@ $<
+
+$(HAL_LIBDIR):
+	$(Q)mkdir -p $@
+
+$(HAL_LIB): $(HAL_LIBOBJS)
+	@echo "  AR    $@"
+	$(Q)$(AR) rcs $@ $^
+
+-include $(HAL_LIBOBJS:.o=.d)
+
 # ---- per-single-core-exercise rules ----------------------------------------
 # $1 = exercise dir under single_core/. Builds TWO M4 images from the same dir:
 #   bare: main_bare.c            -> app_bare.elf / firmware_bare.bin
-#   hal : main_hal.c + full HAL  -> app_hal.elf  / firmware_hal.bin
+#   hal : main_hal.c + libhal.a  -> app_hal.elf  / firmware_hal.bin
 # Both share the startup .s and system_stm32wlxx.c. The HAL image also links
-# hal_glue.c (SysTick_Handler -> HAL_IncTick) and the whole HAL driver set;
-# its objects live in $1/.obj/hal/ so they never clash with the bare objects.
+# hal_glue.c (SysTick_Handler -> HAL_IncTick) and the shared HAL library.
 define SINGLECORE_rules
 # --- bare-metal image ---
 $1/.obj/bare.o: $1/main_bare.c | $1/.obj
@@ -178,16 +198,11 @@ $1/.obj/startup_hal.o: $$(STARTUP) | $1/.obj
 	@echo "  AS    $$< (hal)"
 	$$(Q)$$(CC) $$(ASFLAGS) -c -o $$@ $$<
 
-# One object per HAL driver source, built quietly into $1/.obj/hal/.
-$1/.obj/hal/%.o: $$(HAL_DRV)/Src/%.c | $1/.obj/hal
-	@echo "  CC    $$< (hal-drv)"
-	$$(Q)$$(CC) $$(CFLAGS_HALDRV) -c -o $$@ $$<
-
-$1_HALOBJS := $$(patsubst $$(HAL_DRV)/Src/%.c,$1/.obj/hal/%.o,$$(HAL_DRV_SRCS))
-
-$1/app_hal.elf: $1/.obj/hal_app.o $1/.obj/hal_glue.o $1/.obj/system_hal.o $1/.obj/startup_hal.o $$($1_HALOBJS) $$(LDSCRIPT)
+# Link against the shared HAL library (built once); --gc-sections drops unused.
+$1/app_hal.elf: $1/.obj/hal_app.o $1/.obj/hal_glue.o $1/.obj/system_hal.o $1/.obj/startup_hal.o $$(HAL_LIB) $$(LDSCRIPT)
 	@echo "  LD    $$@"
-	$$(Q)$$(CC) $$(LDFLAGS) -Wl,-Map=$1/app_hal.map -o $$@ $$(filter %.o,$$^) 2>&1 \
+	$$(Q)$$(CC) $$(LDFLAGS) -Wl,-Map=$1/app_hal.map -o $$@ \
+		$1/.obj/hal_app.o $1/.obj/hal_glue.o $1/.obj/system_hal.o $1/.obj/startup_hal.o $$(HAL_LIB) 2>&1 \
 		| grep -vE '$$(LD_NOISE)' || true
 	$$(Q)test -f $$@
 
@@ -199,12 +214,9 @@ $1/firmware_hal.bin: $1/app_hal.elf
 
 $1/.obj:
 	$$(Q)mkdir -p $$@
-$1/.obj/hal:
-	$$(Q)mkdir -p $$@
 
 -include $1/.obj/bare.d $1/.obj/system_bare.d $1/.obj/startup_bare.d
 -include $1/.obj/hal_app.d $1/.obj/hal_glue.d $1/.obj/system_hal.d $1/.obj/startup_hal.d
--include $1/.obj/hal/*.d
 endef
 $(foreach e,$(EXERCISES),$(eval $(call SINGLECORE_rules,$e)))
 
@@ -289,7 +301,8 @@ list:
 	@for e in $(DUALNAMES); do echo "  $$e"; done
 
 clean:
-	$(Q)rm -rf $(SINGLEDIR)/*/.obj $(DUALDIR)/*/.obj
+	$(Q)rm -rf $(SINGLEDIR)/*/.obj $(DUALDIR)/*/.obj $(HAL_LIBDIR)
+	$(Q)rm -f $(HAL_LIB)
 	$(Q)rm -f $(SINGLEDIR)/*/app_bare.elf $(SINGLEDIR)/*/firmware_bare.bin $(SINGLEDIR)/*/app_bare.map
 	$(Q)rm -f $(SINGLEDIR)/*/app_hal.elf $(SINGLEDIR)/*/firmware_hal.bin $(SINGLEDIR)/*/app_hal.map
 	$(Q)rm -f $(SINGLEDIR)/*/app.elf $(SINGLEDIR)/*/firmware.bin $(SINGLEDIR)/*/app.map

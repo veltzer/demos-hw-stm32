@@ -5,6 +5,9 @@
 /exercises/*/*/firmware*.bin
 /exercises/*/*/app*.map
 /exercises/*/*/.obj/
+# shared HAL library, compiled once from the vendored HAL driver set
+/exercises/common/hal/.obj/
+/exercises/common/hal/libhal.a
 # python __pycache__ folders
 __pycache__
 # downloaded installers (e.g. STM32CubeIDE)

@@ -3,29 +3,27 @@
 Hold the board so the **USB connector (CN1, to the ST-LINK) points away from you
 (top edge)** and the component side faces up. Then:
 
-```
-                    ┌──────── USB (CN1, to PC) ────────┐
-                    │            [ ST-LINK ]           │
-   ┌────────────────┴──────────────────────────────────┴────────────────┐
-   │  (B4)                                                                │
-   │  RESET ●  ← top-left, next to ST-LINK                                │
-   │           = NRST, resets the MCU. NOT a user button.                 │
-   │                                                                      │
-   │                         ● LD5 (ST-LINK status)                       │
-   │                                                                      │
-   │                  STM32WL55JC                                         │
-   │                  (big chip, center)        ● LD1 (blue)   = PB15     │
-   │                                            ● LD2 (green)  = PB9      │
-   │                                            ● LD3 (red)    = PB11     │
-   │                                                                      │
-   │   user buttons, bottom-left edge:                                    │
-   │     ● B1  (USER) = PA0   (or PC13, depends on solder bridges)        │
-   │     ● B2  (USER) = PA1                                               │
-   │     ● B3  (USER) = PC6                                               │
-   │                                                                      │
-   └──────────────────────────────────────────────────────────────────────┘
-                      (Arduino / Morpho headers along the long edges)
-```
+                        ┌──────── USB (CN1, to PC) ────────┐
+                        │            [ ST-LINK ]           │
+       ┌────────────────┴──────────────────────────────────┴────────────────┐
+       │  (B4)                                                                │
+       │  RESET ●  ← top-left, next to ST-LINK                                │
+       │           = NRST, resets the MCU. NOT a user button.                 │
+       │                                                                      │
+       │                         ● LD5 (ST-LINK status)                       │
+       │                                                                      │
+       │                  STM32WL55JC                                         │
+       │                  (big chip, center)        ● LD1 (blue)   = PB15     │
+       │                                            ● LD2 (green)  = PB9      │
+       │                                            ● LD3 (red)    = PB11     │
+       │                                                                      │
+       │   user buttons, bottom-left edge:                                    │
+       │     ● B1  (USER) = PA0   (confirmed; active-low)                    │
+       │     ● B2  (USER) = PA1                                               │
+       │     ● B3  (USER) = PC6                                               │
+       │                                                                      │
+       └──────────────────────────────────────────────────────────────────────┘
+                          (Arduino / Morpho headers along the long edges)
 
 ## Buttons
 
@@ -36,10 +34,9 @@ Hold the board so the **USB connector (CN1, to the ST-LINK) points away from you
 | **B3**     | USER button | PC6                                    |
 | **B4**     | RESET       | NRST (resets the chip; not a GPIO in)  |
 
-\* B1 is wired to **PA0** when solder bridge SB16 is ON / SB15 OFF (factory
-default), or to **PC13** when SB15 is ON / SB16 OFF. On *this* board B1 reads as
-**PC13** (PA0 sits low and never changes on press — see below), so exercises
-that react to B1 use **PC13 / EXTI line 13**.
+\* B1 can be wired to **PA0** (factory default, SB16 ON / SB15 OFF) or **PC13**
+(SB15 ON / SB16 OFF). On *this* board B1 is **PA0** — confirmed with
+02_buttons_test (see below). The button exercises use PA0 / EXTI line 0.
 
 All user buttons are **active-low**: the pin idles HIGH (internal pull-up) and
 goes LOW while the button is held.
