@@ -19,7 +19,7 @@ command-to-package mapping (keep this in sync if scripts gain new tools):
 | `pass`                                  | `pass`                   |
 | `arm-none-eabi-gcc` / `objcopy` / `size`| `gcc-arm-none-eabi`, `binutils-arm-none-eabi`, `libnewlib-arm-none-eabi` |
 
-`STM32_Programmer_CLI` (used by `halt.sh`, `reset.sh`, `check*.sh`, `run.sh`,
+`STM32_Programmer_CLI` (used by `mass_erase.sh`, `reset.sh`, `check*.sh`, `run.sh`,
 `remove_protection.sh`, `show_devices.sh`) is **not** an apt package - it ships
 with the proprietary STM32CubeIDE install, so it is not in `install_deps.sh`.
 

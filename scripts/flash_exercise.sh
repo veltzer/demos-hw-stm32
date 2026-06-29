@@ -13,4 +13,6 @@ EX="$1"
 "$HERE/scripts/build_exercise.sh" "$EX"
 BIN="$HERE/exercises/$EX/firmware.bin"
 echo "flashing $BIN to 0x08000000"
-st-flash write "$BIN" 0x08000000
+# --connect-under-reset: the running firmware can hold the SWD lines so a plain
+# connect fails with "Failed to read core_id"; connecting under reset fixes it.
+st-flash --connect-under-reset write "$BIN" 0x08000000

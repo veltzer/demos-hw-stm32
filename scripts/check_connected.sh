@@ -65,7 +65,9 @@ if command -v st-info >/dev/null 2>&1; then
 elif [ -x "${CLI}" ]; then
 	# Fall back to ST's official programmer CLI (already installed with CubeIDE).
 	info "st-info not installed; using STM32_Programmer_CLI instead."
-	if "${CLI}" -c port=SWD; then
+	# mode=UR (connect under reset): running firmware can hold the SWD lines so a
+	# plain connect fails with "Unable to get core ID"; under reset fixes it.
+	if "${CLI}" -c port=SWD mode=UR; then
 		green "OK: STM32_Programmer_CLI connected to the target over SWD."
 	else
 		red "FAIL: STM32_Programmer_CLI could not connect over SWD."
