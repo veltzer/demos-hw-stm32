@@ -24,11 +24,11 @@ fi
 items=()        # tag + description pairs for the menu
 for dir in "$SINGLEDIR"/[0-9]*_*/; do
 	[ -f "$dir/main_bare.c" ] || continue
-	items+=("$(basename "$dir")" "single-core (bare + HAL)")
+	items+=("$(basename "$dir")" "single-core")
 done
 for dir in "$DUALDIR"/[0-9]*_*/; do
 	[ -f "$dir/main_cm4_bare.c" ] || continue
-	items+=("$(basename "$dir")" "dual-core, both cores (bare + HAL)")
+	items+=("$(basename "$dir")" "dual-core")
 done
 
 if [ "${#items[@]}" -eq 0 ]; then
@@ -48,7 +48,7 @@ choice="$("$MENU" --title "Flash an exercise" \
 
 # Second menu: bare-metal vs HAL solution for the chosen exercise.
 variant="$("$MENU" --title "Which solution?" \
-	--menu "Build '$choice' as:" \
+	--menu "Flash '$choice' as:" \
 	12 60 2 \
 	bare "register-level (bare metal)" \
 	hal  "using the STM32 HAL" \
