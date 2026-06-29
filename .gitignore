@@ -8,3 +8,6 @@
 __pycache__
 # downloaded installers (e.g. STM32CubeIDE)
 /download/
+*.elf
+*.map
+*.bin

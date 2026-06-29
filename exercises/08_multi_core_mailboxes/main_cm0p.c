@@ -1,25 +1,26 @@
 #include "stm32wl55xx.h"
 
 int main(void) {
-    // M0+ specific initializations...
-    // Setup GPIO for an LED (e.g., LD3 on PA10)
-    RCC->AHB2ENR |= RCC_AHB2ENR_GPIOAEN;
-    GPIOA->MODER &= ~GPIO_MODER_MODE10_1;
-    GPIOA->MODER |= GPIO_MODER_MODE10_0;
+    // M0+ specific initializations.
+    // Setup GPIO for LD3 (the red LED on PB11; the user LEDs are on port B).
+    RCC->AHB2ENR |= RCC_AHB2ENR_GPIOBEN;
+    GPIOB->MODER &= ~GPIO_MODER_MODE11_1;
+    GPIOB->MODER |= GPIO_MODER_MODE11_0;
 
     // Enable IPCC clock
     RCC->AHB3ENR |= RCC_AHB3ENR_IPCCEN;
 
-    // Enable receive interrupt on IPCC channel 1 for CPU2
-    IPCC->C2CR |= IPCC_C2CR_RXOIE;
+    // Poll channel 1 here (interrupts are an extension). Unmask channel 1's
+    // RX-occupied event on the CPU2 side by clearing its mask bit.
+    IPCC->C2MR &= ~IPCC_C2MR_CH1OM;
 
     while (1) {
-        // Check if a message is pending on channel 1 from M4
-        if (IPCC->C2SR & IPCC_C2SR_CH1S) {
-            // Clear the flag to acknowledge receipt
+        // A message from the M4 shows up as the CPU1->CPU2 occupied flag.
+        if (IPCC->C1TOC2SR & IPCC_C1TOC2SR_CH1F) {
+            // Acknowledge receipt: clear the channel from the CPU2 side.
             IPCC->C2SCR = IPCC_C2SCR_CH1C;
-            // Toggle the LED
-            GPIOA->ODR ^= GPIO_ODR_OD10;
+            // Toggle the LED.
+            GPIOB->ODR ^= GPIO_ODR_OD11;
         }
     }
 }

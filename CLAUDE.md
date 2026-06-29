@@ -33,8 +33,18 @@ When adding a tool to any script or the Makefile, add its package to
 
 - The set of buildable exercises is **discovered from the filesystem**, not
   hardcoded: an `exercises/NN_name/` dir with a `main.c` and no
-  `main_cm4.c` is a single-core exercise and is built. Dual-core exercises
-  (which carry `main_cm4.c`) and sourceless ones are excluded automatically.
+  `main_cm4.c` is a single-core exercise and is built. A dir with a
+  `main_cm4.c` + `main_cm0p.c` is a dual-core exercise: it builds **two**
+  images, one per core (see below). Sourceless dirs are excluded automatically.
+- Dual-core exercises build an M4 image (`app_cm4.elf`/`firmware_cm4.bin`) from
+  `main_cm4.c` and an M0+ image (`app_cm0p.elf`/`firmware_cm0p.bin`) from
+  `main_cm0p.c`. The M0+ uses its own startup (`startup_stm32wl55jcix_cm0plus.s`,
+  the smaller M0+ vector table) and linker script
+  (`STM32WL55JCIX_FLASH_CM0PLUS.ld`, flash bank 2 @ `0x08020000`, SRAM2 @
+  `0x20008000`) so the two cores' images never overlap. Compiled with
+  `-mcpu=cortex-m0plus -DCORE_CM0PLUS`. **Building is done; actually running the
+  M0+ still needs the `C2BOOT`/`SBRV` option bytes set and both images flashed —
+  that is a separate, deliberate step and is not automated here.**
 - Each exercise links its `main*.c` against the shared CMSIS / startup / linker
   support in `exercises/common/` (copied from the CubeIDE `workspace/blink`
   project; the `workspace/` tree itself is generated IDE output).
@@ -92,8 +102,10 @@ installer from st.com, **fully unattended** (no AI / no manual browser steps).
 - The `exercises/*/main.c` are bare register-level programs. Some have genuine
   bugs that the build surfaces; the build system is a plain compiler and does
   not paper over them.
-- Dual-core exercises (`08`, `09`) need a from-scratch Cortex-M0+
-  startup/linker/option-bytes and are **not** built or flashed yet (TODO).
+- Dual-core exercises (`08`, `09`) now **build** both cores' images (M4 + M0+)
+  via the from-scratch M0+ startup/linker added under `exercises/common/`. They
+  are **not flashed/run** yet: that needs the `C2BOOT`/`SBRV` option bytes set
+  so the M0+ boots from flash bank 2, plus flashing both images (TODO).
 - The ST-LINK exposes a USB Virtual COM Port at `/dev/ttyACM0`. Serial output
   appears only if firmware transmits on a UART that is routed to that VCP, at a
   matching baud rate.

@@ -13,10 +13,12 @@ int main(void) {
     // Ensure CM0+ is running its own firmware.
 
     while (1) {
-        // Wait for IPCC channel 1 to be free on CPU1 side
-        while (IPCC->C1SR & IPCC_C1SR_CH1S);
+        // Wait until channel 1 is free again (the M0+ has acknowledged the
+        // previous message by clearing it). The CPU1->CPU2 channel-occupied
+        // flag lives in C1TOC2SR.CH1F.
+        while (IPCC->C1TOC2SR & IPCC_C1TOC2SR_CH1F);
 
-        // Set a flag on IPCC channel 1 to signal the M0+
+        // Mark channel 1 occupied (set the status) to signal the M0+.
         IPCC->C1SCR = IPCC_C1SCR_CH1S;
 
         delay(1000000); // Send signal every so often
