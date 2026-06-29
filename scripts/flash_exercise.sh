@@ -1,7 +1,7 @@
 #!/bin/bash -eu
 # build a single exercise and flash it to the board with STM32_Programmer_CLI
 # usage: scripts/flash_exercise.sh <exercise>
-#   scripts/flash_exercise.sh 04_uart
+#   scripts/flash_exercise.sh 02_serial_counter
 HERE="$(dirname "$0")/.."
 source "$HERE/scripts/cubeide.sh"
 if [ "$#" -lt 1 ]; then

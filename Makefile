@@ -2,7 +2,7 @@
 #
 # Usage:
 #   make                       # build every single-core exercise (incremental)
-#   make 04_uart               # build just one exercise
+#   make 02_serial_counter     # build just one exercise
 #   make list                  # list the exercises that will be built
 #   make clean
 #   make V=1 ...               # verbose: echo the underlying commands
@@ -119,8 +119,8 @@ $1/.obj:
 endef
 $(foreach e,$(EXERCISES),$(eval $(call EXERCISE_rules,$e)))
 
-# Convenience targets so you can build by bare name (e.g. `make 04_uart`) or by
-# full path (`make exercises/04_uart`); both map to that exercise's binary.
+# Convenience targets so you can build by bare name (e.g. `make 02_serial_counter`)
+# or by full path (`make exercises/02_serial_counter`); both map to its binary.
 $(NAMES): %: $(DIR)/%/firmware.bin
 $(EXERCISES): %: %/firmware.bin
 .PHONY: $(NAMES) $(EXERCISES)

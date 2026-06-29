@@ -48,7 +48,7 @@ When adding a tool to any script or the Makefile, add its package to
 Commands:
 
     make                 # build all single-core exercises (incremental)
-    make 04_uart         # build one exercise by name
+    make 02_serial_counter   # build one exercise by name
     make list            # list discovered exercises
     make clean
     make -k              # keep going past a broken exercise

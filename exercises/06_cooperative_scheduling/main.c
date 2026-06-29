@@ -11,7 +11,7 @@ static uint32_t HAL_GetTick(void) { return ++fake_tick; }
 void task1_blink_slow(void) {
     static uint32_t last_run = 0;
     if ( (HAL_GetTick() - last_run) > 500 ) { // Using HAL_GetTick for simplicity here
-        GPIOA->ODR ^= GPIO_ODR_OD15;
+        GPIOB->ODR ^= GPIO_ODR_OD15; // LD1 (blue, PB15)
         last_run = HAL_GetTick();
     }
 }
@@ -20,7 +20,7 @@ void task1_blink_slow(void) {
 void task2_blink_fast(void) {
     static uint32_t last_run = 0;
     if ( (HAL_GetTick() - last_run) > 100 ) {
-        GPIOA->ODR ^= GPIO_ODR_OD11;
+        GPIOB->ODR ^= GPIO_ODR_OD9; // LD2 (green, PB9)
         last_run = HAL_GetTick();
     }
 }
@@ -36,10 +36,10 @@ int main(void) {
     // TODO: set up a real 1 ms time base here (SysTick) so HAL_GetTick()
     // returns milliseconds. For now it is just a free-running counter.
 
-    // Setup GPIOs for LD1 and LD2 (as in exercise 2)
-    RCC->AHB2ENR |= RCC_AHB2ENR_GPIOAEN;
-    GPIOA->MODER &= ~(GPIO_MODER_MODE15_1 | GPIO_MODER_MODE11_1);
-    GPIOA->MODER |= (GPIO_MODER_MODE15_0 | GPIO_MODER_MODE11_0);
+    // Setup GPIOs for LD1 (PB15) and LD2 (PB9); the user LEDs are on port B.
+    RCC->AHB2ENR |= RCC_AHB2ENR_GPIOBEN;
+    GPIOB->MODER &= ~(GPIO_MODER_MODE15_1 | GPIO_MODER_MODE9_1);
+    GPIOB->MODER |= (GPIO_MODER_MODE15_0 | GPIO_MODER_MODE9_0);
 
 
     while (1) {

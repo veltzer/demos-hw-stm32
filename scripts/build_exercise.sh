@@ -1,7 +1,7 @@
 #!/bin/bash -eu
 # build a single exercise into app.elf and firmware.bin
 # usage: scripts/build_exercise.sh <exercise>
-#   scripts/build_exercise.sh 04_uart
+#   scripts/build_exercise.sh 02_serial_counter
 ROOT="$(dirname "$0")/.."
 if [ "$#" -lt 1 ]; then
 	echo "usage: $0 <exercise>"
