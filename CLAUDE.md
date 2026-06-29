@@ -96,14 +96,25 @@ Commands:
 
 Build first with `make` (above); the flash scripts only flash, never build.
 
-    scripts/flash_exercise.sh <name> [bare|hal]  # flash a pre-built single-core
-                                                 #   exercise (default: bare)
-                                                 #   via STM32_Programmer_CLI,
+    scripts/flash_exercise.sh <name> [bare|hal]  # flash a pre-built exercise
+                                                 #   (default: bare) via
+                                                 #   STM32_Programmer_CLI,
                                                  #   connect-under-reset
     scripts/flash_menu.sh                        # TUI: pick exercise + variant
 
-Only single-core exercises are flashable; dual-core ones build two images but
-need option bytes to run, so the flash scripts refuse them with a message.
+Both single- and dual-core exercises are flashable. For a dual-core exercise,
+`flash_exercise.sh` programs BOTH images -- M0+ to flash bank 2 (`0x08020000`)
+and M4 to bank 1 (`0x08000000`) -- then resets. The M4 firmware boots the M0+
+with `PWR.C2BOOT`; `SBRV` already points at bank 2, so no option bytes are
+changed.
+
+### Stopping a running app
+
+You cannot "stop" firmware that lives in flash by resetting or halting it: a
+reset just re-runs it (and the M4 re-boots the M0+ via `C2BOOT`), and a
+one-shot `STM32_Programmer_CLI -halt` releases the core as soon as the command
+exits. To actually stop it you must change flash -- erase it with
+`scripts/mass_erase.sh`, or flash a different image over it.
 
 ## Downloading STM32CubeIDE
 
