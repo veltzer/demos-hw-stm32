@@ -83,15 +83,19 @@ LDFLAGS_CM0 := $(CPU_CM0) -T$(LDSCRIPT_CM0) -Wl,--gc-sections \
 	--specs=nano.specs --specs=nosys.specs
 
 # ---- HAL support (for the single_core_hal exercises) -----------------------
-# The vendored STM32WL HAL lives under common/hal/. HAL builds add USE_HAL_DRIVER
-# and a few extra include dirs (HAL Inc + the dir holding stm32wlxx_hal_conf.h).
-HALROOT    := $(COMMON)/hal
-HAL_DRV    := $(HALROOT)/Drivers/STM32WLxx_HAL_Driver
-HAL_GLUE   := $(HALROOT)/hal_glue.c
+# The full STM32WL HAL/LL/CMSIS comes from the STM32CubeWL package cloned into
+# the repo root by scripts/clone_cubewl.sh (gitignored -- NOT vendored in-repo,
+# so no duplication). Only our project config (stm32wlxx_hal_conf.h) and the
+# glue (hal_glue.c) live in the repo, under common/hal_config/.
+# Override CUBEWL on the command line to point elsewhere.
+CUBEWL     ?= STM32CubeWL
+HAL_DRV    := $(CUBEWL)/Drivers/STM32WLxx_HAL_Driver
+HAL_CFGDIR := $(COMMON)/hal_config
+HAL_GLUE   := $(HAL_CFGDIR)/hal_glue.c
 HAL_INCLUDES := $(INCLUDES) \
 	-I$(HAL_DRV)/Inc \
 	-I$(HAL_DRV)/Inc/Legacy \
-	-I$(HALROOT)/Inc
+	-I$(HAL_CFGDIR)
 # HAL needs USE_HAL_DRIVER; the M4 cpu/defines are otherwise the same.
 CFLAGS_HAL := $(CPU) $(DEFS) -DUSE_HAL_DRIVER $(HAL_INCLUDES) -Wall -Wextra -O2 -g3 \
 	-ffunction-sections -fdata-sections -MMD -MP
@@ -100,12 +104,20 @@ CFLAGS_HAL := $(CPU) $(DEFS) -DUSE_HAL_DRIVER $(HAL_INCLUDES) -Wall -Wextra -O2 
 CFLAGS_HALDRV := $(CPU) $(DEFS) -DUSE_HAL_DRIVER $(HAL_INCLUDES) -w -O2 -g3 \
 	-ffunction-sections -fdata-sections -MMD -MP
 # The HAL driver set is compiled ONCE into a shared static library and every HAL
-# app links against it (--gc-sections then drops the unused parts per app).
-HAL_DRV_SRCS := $(wildcard $(HAL_DRV)/Src/*.c)
-HAL_LIBDIR   := $(HALROOT)/.obj
+# app links against it (--gc-sections then drops the unused parts per app). The
+# library + objects build under common/ (NOT inside the gitignored clone).
+# Exclude *_template.c: those are copy-me starting points, not buildable drivers.
+HAL_DRV_SRCS := $(filter-out %_template.c,$(wildcard $(HAL_DRV)/Src/*.c))
+HAL_LIBDIR   := $(COMMON)/.hal_obj
 HAL_LIBOBJS  := $(patsubst $(HAL_DRV)/Src/%.c,$(HAL_LIBDIR)/%.o,$(HAL_DRV_SRCS))
-HAL_LIB      := $(HALROOT)/libhal.a
+HAL_LIB      := $(COMMON)/libhal.a
 AR           := $(PREFIX)ar
+
+# Fail early with a clear message if the HAL package hasn't been cloned.
+ifeq ($(wildcard $(HAL_DRV)/Src/stm32wlxx_hal_ipcc.c),)
+$(warning STM32CubeWL not found at '$(CUBEWL)'. HAL exercises will not build.)
+$(warning Run: scripts/clone_cubewl.sh   (or set CUBEWL=/path/to/STM32CubeWL))
+endif
 
 # Linker lines that are benign on bare metal and should be hidden: the
 # newlib-nano unimplemented-syscall warnings, their context/note lines, and the

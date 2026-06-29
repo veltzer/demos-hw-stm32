@@ -26,6 +26,22 @@ with the proprietary STM32CubeIDE install, so it is not in `install_deps.sh`.
 When adding a tool to any script or the Makefile, add its package to
 `scripts/install_deps.sh`.
 
+### STM32CubeWL HAL package (for the HAL exercises)
+
+The HAL solutions build against ST's full **STM32CubeWL** firmware package (the
+complete HAL/LL/CMSIS, including drivers the CubeIDE blink project never
+generates, e.g. IPCC and HSEM). It is **not vendored in-repo** -- to avoid
+duplication it is cloned into the repo root as `STM32CubeWL/` (gitignored):
+
+    scripts/clone_cubewl.sh        # clone STM32CubeWL + needed submodules
+
+The Makefile points the HAL build at `STM32CubeWL/` (override with
+`make CUBEWL=/path/to/STM32CubeWL`). Only our project config
+(`exercises/common/hal_config/stm32wlxx_hal_conf.h`, which selects the enabled
+HAL modules) and the SysTick glue (`hal_glue.c`) live in the repo. If the clone
+is missing, `make` warns and the HAL exercises won't build (the bare-metal ones,
+which use the self-contained `exercises/common/CMSIS`, still build).
+
 ## Build system
 
 `Makefile` lives at the repo root and builds the exercises under `exercises/`,

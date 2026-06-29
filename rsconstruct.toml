@@ -4,10 +4,13 @@
 # (they include vendor headers like stm32wl55xx.h and some are bare snippets),
 # so they are not host-compilable and are only term/markdown checked here.
 # The workspace/ tree is generated STM32CubeIDE/CMake output and is excluded.
+# The STM32CubeWL/ tree is the externally-cloned vendor HAL package (gitignored)
+# and is likewise excluded from linting.
 
 [vars]
 generated_excludes = [
 	"/workspace/",
+	"/STM32CubeWL/",
 ]
 
 # Lint the helper shell scripts.
