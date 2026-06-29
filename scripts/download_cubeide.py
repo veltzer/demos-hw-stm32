@@ -76,6 +76,24 @@ def check_reachable(url=REACH_URL, timeout=10, attempts=4):
             return True, f"HTTP {e.code}"
         except Exception as e:
             last = f"{type(e).__name__}: {e}"
+
+    # urllib failed. st.com's Akamai edge often returns a valid HTTP status and
+    # THEN resets the HTTP/2 stream - urllib treats that as a hard error, but it
+    # means the host is alive and a real browser (Playwright) will cope. curl
+    # reports the status code it got before the reset, so fall back to it.
+    try:
+        out = subprocess.run(
+            ["curl", "-sSL", "-o", "/dev/null", "-w", "%{http_code}",
+             "-A", BROWSER_UA, "--max-time", str(timeout), url],
+            capture_output=True, text=True, timeout=timeout + 5,
+        )
+        code = (out.stdout or "").strip()
+        if code and code != "000":
+            return True, f"HTTP {code} (curl; urllib reset)"
+        last = f"curl http_code={code or 'none'}"
+    except Exception as e:
+        last = f"{last}; curl: {type(e).__name__}: {e}"
+
     return False, f"{attempts} attempts failed (last: {last})"
 
 
@@ -144,24 +162,36 @@ def select_linux_os(page):
         print("    [select_linux_os] no swos OS dropdown found", file=sys.stderr)
         return False
 
-    # The swos OS list is populated by JS, often only AFTER a version is chosen.
-    # So pick a version in swversion first (and fire change) to trigger it.
+    # The swos OS list is populated by JS, only AFTER a version is chosen via
+    # the page's own onchange handler. Use Playwright select_option on the
+    # version select (fires the native events the site's JS listens for) - a
+    # raw dispatchEvent was not enough.
     ver = page.locator("select.swversion, #swversion_0").first
     try:
         ver_opts = ver.locator("option").all_inner_texts()
         first_ver = next((o for o in ver_opts if o.strip() and o.strip() != "-"),
                          None)
         if first_ver:
+            # select_option by label AND trigger the site handler explicitly in
+            # case it binds via jQuery .change() rather than addEventListener.
             ver.select_option(label=first_ver.strip())
-            ver.evaluate("el => el.dispatchEvent(new Event('change',{bubbles:true}))")
+            try:
+                page.evaluate(
+                    "() => { const v=document.querySelector('#swversion_0');"
+                    "  if(!v) return;"
+                    "  v.dispatchEvent(new Event('change',{bubbles:true}));"
+                    "  if(window.jQuery) jQuery(v).trigger('change');"
+                    "  if(typeof onSelectVersion==='function') onSelectVersion(v); }")
+            except Exception:
+                pass
             print(f"    [select_linux_os] picked version {first_ver.strip()}",
                   file=sys.stderr)
     except Exception as e:
         print(f"    [select_linux_os] version pick skipped: {e}", file=sys.stderr)
 
-    # Poll for the swos options to populate (JS may load them asynchronously).
+    # Poll up to ~12s for swos options to populate (JS / AJAX is async).
     opts = []
-    for _ in range(12):  # up to ~6s
+    for _ in range(24):
         try:
             opts = sel.locator("option").all_inner_texts()
         except Exception:
@@ -169,21 +199,6 @@ def select_linux_os(page):
         if any("linux" in (o or "").lower() for o in opts):
             break
         page.wait_for_timeout(500)
-    # If still empty, the list may load on focus/click of the OS select itself.
-    if not any("linux" in (o or "").lower() for o in opts):
-        for action in ("focus", "click"):
-            try:
-                getattr(sel, action)(timeout=2000) if action == "click" \
-                    else sel.focus(timeout=2000)
-            except Exception:
-                pass
-            page.wait_for_timeout(1200)
-            try:
-                opts = sel.locator("option").all_inner_texts()
-            except Exception:
-                opts = []
-            if any("linux" in (o or "").lower() for o in opts):
-                break
     print(f"    [select_linux_os] swos options: {opts}", file=sys.stderr)
     linux_label = next((o for o in opts if "linux" in (o or "").lower()), None)
 
@@ -214,13 +229,17 @@ def select_linux_os(page):
         except Exception:
             return False
 
-    # Fire change/input so the page's JS reveals the Get-latest button.
+    # Fire the site's own handler (the select has onchange="onSelectOs(this)")
+    # so it reveals the Get-latest button for the Linux row.
     try:
-        sel.evaluate(
-            "el => { el.dispatchEvent(new Event('change',{bubbles:true}));"
-            "        el.dispatchEvent(new Event('input',{bubbles:true})); }")
+        page.evaluate(
+            "() => { const el=document.querySelector('#swos_0'); if(!el) return;"
+            "  el.dispatchEvent(new Event('change',{bubbles:true}));"
+            "  if(window.jQuery) jQuery(el).trigger('change');"
+            "  if(typeof onSelectOs==='function') onSelectOs(el); }")
     except Exception:
         pass
+    page.wait_for_timeout(1500)
     print(f"    [select_linux_os] selected: {linux_label.strip()}", file=sys.stderr)
     return True
 
