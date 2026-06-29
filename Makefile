@@ -156,11 +156,10 @@ DUALNAMES  := $(notdir $(dualcore))
 
 # Each single-core exercise produces two images: bare-metal and HAL.
 BINS := $(foreach e,$(EXERCISES),$(e)/firmware_bare.bin $(e)/firmware_hal.bin)
-# Each dual-core exercise always produces the two _bare core images; it also
-# produces the two _hal core images IF the corresponding _hal sources exist.
+# Each dual-core exercise produces FOUR images: both cores, each as bare + HAL.
+# (Every exercise must ship all four sources -- there is no optional variant.)
 dual-bins = $1/firmware_cm4_bare.bin $1/firmware_cm0p_bare.bin \
-	$(if $(wildcard $1/main_cm4_hal.c),$1/firmware_cm4_hal.bin) \
-	$(if $(wildcard $1/main_cm0p_hal.c),$1/firmware_cm0p_hal.bin)
+	$1/firmware_cm4_hal.bin $1/firmware_cm0p_hal.bin
 DUALBINS := $(foreach e,$(dualcore),$(call dual-bins,$e))
 
 .PHONY: all list clean
@@ -345,8 +344,7 @@ $1/firmware_cm0p_hal.bin: $1/app_cm0p_hal.elf
 endef
 
 $(foreach e,$(dualcore),$(eval $(call DUALCORE_bare,$e)))
-# HAL rules only for exercises that ship the _hal sources.
-$(foreach e,$(dualcore),$(if $(wildcard $e/main_cm4_hal.c),$(eval $(call DUALCORE_hal,$e))))
+$(foreach e,$(dualcore),$(eval $(call DUALCORE_hal,$e)))
 
 # Convenience targets. A single-core bare name (e.g. `make 02_serial_counter`)
 # builds BOTH that exercise's images (bare + HAL). Full-path targets also work.
