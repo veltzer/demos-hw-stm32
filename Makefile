@@ -10,7 +10,7 @@
 #
 # This Makefile lives at the repo root and operates on exercises/.
 # The set of buildable exercises is DISCOVERED from the filesystem, not listed:
-# any exercises/NN_name/ that has a main.c or main_1.c and no main_cm4.c is a
+# any exercises/NN_name/ that has a main.c and no main_cm4.c is a
 # single-core exercise and is built. Each is linked against the shared CMSIS /
 # startup / linker support under exercises/common/. Builds are incremental
 # (per-object compilation with -MMD header dependency tracking).
@@ -67,9 +67,9 @@ libc_nano\.a|in function .(_close_r|_lseek_r|_read_r|_write_r|_sbrk_r|_fstat_r|_
 has a LOAD segment with RWX permissions|warn-rwx-segments
 
 # ---- discovery -------------------------------------------------------------
-# Candidate exercises: every exercises/NN_name dir holding a main.c or main_1.c.
+# Candidate exercises: every exercises/NN_name dir holding a main.c.
 candidates := $(sort $(patsubst %/,%,$(dir \
-	$(wildcard $(DIR)/[0-9]*_*/main.c) $(wildcard $(DIR)/[0-9]*_*/main_1.c))))
+	$(wildcard $(DIR)/[0-9]*_*/main.c))))
 # Drop dual-core exercises (those also carry a main_cm4.c).
 dualcore   := $(patsubst %/,%,$(dir $(wildcard $(DIR)/[0-9]*_*/main_cm4.c)))
 # Full paths (exercises/NN_name) used by the build rules ...
@@ -77,8 +77,8 @@ EXERCISES  := $(filter-out $(dualcore),$(candidates))
 # ... and their bare names (NN_name) used as convenience targets.
 NAMES      := $(notdir $(EXERCISES))
 
-# Per-exercise primary source: main.c if present, else main_1.c.
-app-src = $(firstword $(wildcard $1/main.c $1/main_1.c))
+# Per-exercise source.
+app-src = $1/main.c
 
 BINS := $(foreach e,$(EXERCISES),$(e)/firmware.bin)
 

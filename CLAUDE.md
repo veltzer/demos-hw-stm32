@@ -32,7 +32,7 @@ When adding a tool to any script or the Makefile, add its package to
 `exercises/`.
 
 - The set of buildable exercises is **discovered from the filesystem**, not
-  hardcoded: an `exercises/NN_name/` dir with a `main.c` or `main_1.c` and no
+  hardcoded: an `exercises/NN_name/` dir with a `main.c` and no
   `main_cm4.c` is a single-core exercise and is built. Dual-core exercises
   (which carry `main_cm4.c`) and sourceless ones are excluded automatically.
 - Each exercise links its `main*.c` against the shared CMSIS / startup / linker

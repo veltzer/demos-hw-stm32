@@ -4,14 +4,15 @@
 void TIM16_IRQHandler(void) {
     if (TIM16->SR & TIM_SR_UIF) {
         TIM16->SR &= ~TIM_SR_UIF; // Clear update interrupt flag
-        GPIOA->ODR ^= GPIO_ODR_OD15; // Toggle LED
+        GPIOB->ODR ^= GPIO_ODR_OD15; // Toggle LD1 (blue, PB15)
     }
 }
 
 int main(void) {
-    RCC->AHB2ENR |= RCC_AHB2ENR_GPIOAEN;
-    GPIOA->MODER &= ~GPIO_MODER_MODE15_1;
-    GPIOA->MODER |= GPIO_MODER_MODE15_0;
+    // The user LEDs are on port B (LD1 = PB15, the blue LED).
+    RCC->AHB2ENR |= RCC_AHB2ENR_GPIOBEN;
+    GPIOB->MODER &= ~GPIO_MODER_MODE15_1;
+    GPIOB->MODER |= GPIO_MODER_MODE15_0;
 
     // Enable TIM16 clock
     RCC->APB2ENR |= RCC_APB2ENR_TIM16EN;
