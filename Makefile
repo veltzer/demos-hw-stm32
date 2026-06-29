@@ -195,164 +195,57 @@ $(HAL_LIB_CM0): $(HAL_LIBOBJS_CM0)
 
 -include $(HAL_LIBOBJS_CM0:.o=.d)
 
-# ---- per-single-core-exercise rules ----------------------------------------
-# $1 = exercise dir under single_core/. Builds TWO M4 images from the same dir:
-#   bare: main_bare.c            -> app_bare.elf / firmware_bare.bin
-#   hal : main_hal.c + libhal_cm4.a -> app_hal.elf / firmware_hal.bin
-# Both share the startup .s and system_stm32wlxx.c. The HAL image also links the
-# shared HAL library; each main_hal.c provides its own SysTick_Handler.
-define SINGLECORE_rules
-# --- bare-metal image ---
-$1/.obj/bare.o: $1/main_bare.c | $1/.obj
-	@echo "  CC    $$< (bare)"
-	$$(Q)$$(CC) $$(CFLAGS) -c -o $$@ $$<
-
-$1/.obj/system_bare.o: $$(SYSTEM) | $1/.obj
-	@echo "  CC    $$< (bare)"
-	$$(Q)$$(CC) $$(CFLAGS) -c -o $$@ $$<
-
-$1/.obj/startup_bare.o: $$(STARTUP) | $1/.obj
-	@echo "  AS    $$< (bare)"
-	$$(Q)$$(CC) $$(ASFLAGS) -c -o $$@ $$<
-
-$1/app_bare.elf: $1/.obj/bare.o $1/.obj/system_bare.o $1/.obj/startup_bare.o $$(LDSCRIPT)
+# ---- generic image template ------------------------------------------------
+# IMAGE builds ONE firmware image (app + system + startup [+ optional HAL lib]).
+# Every exercise image -- single/dual, bare/hal, M4/M0+ -- is one $(call) to it.
+#   $1 dir   $2 tag (e.g. bare, hal, cm4_bare)   $3 app source (.c)
+#   $4 CFLAGS   $5 ASFLAGS   $6 LDFLAGS   $7 startup .s   $8 linker .ld
+#   $9 HAL lib to link (empty for bare)
+# Outputs: $1/app_$2.elf, $1/firmware_$2.bin; objects in $1/.obj/*_$2.o.
+define IMAGE
+$1/.obj/app_$2.o: $3 | $1/.obj
+	@echo "  CC    $$< ($2)"
+	$$(Q)$$(CC) $4 -c -o $$@ $$<
+$1/.obj/system_$2.o: $$(SYSTEM) | $1/.obj
+	$$(Q)$$(CC) $4 -c -o $$@ $$<
+$1/.obj/startup_$2.o: $7 | $1/.obj
+	$$(Q)$$(CC) $5 -c -o $$@ $$<
+$1/app_$2.elf: $1/.obj/app_$2.o $1/.obj/system_$2.o $1/.obj/startup_$2.o $9 $8
 	@echo "  LD    $$@"
-	$$(Q)$$(CC) $$(LDFLAGS) -Wl,-Map=$1/app_bare.map -o $$@ $$(filter %.o,$$^) 2>&1 \
+	$$(Q)$$(CC) $6 -Wl,-Map=$1/app_$2.map -o $$@ \
+		$1/.obj/app_$2.o $1/.obj/system_$2.o $1/.obj/startup_$2.o $9 2>&1 \
 		| grep -vE '$$(LD_NOISE)' || true
 	$$(Q)test -f $$@
-
-$1/firmware_bare.bin: $1/app_bare.elf
+$1/firmware_$2.bin: $1/app_$2.elf
 	@echo "  BIN   $$@"
 	$$(Q)$$(OBJCOPY) -O binary $$< $$@
-	$$(Q)$$(SIZE) $$<
+-include $1/.obj/app_$2.d $1/.obj/system_$2.d $1/.obj/startup_$2.d
+endef
 
-# --- HAL image (each main_hal.c defines its own SysTick_Handler) ---
-$1/.obj/hal_app.o: $1/main_hal.c | $1/.obj
-	@echo "  CC    $$< (hal)"
-	$$(Q)$$(CC) $$(CFLAGS_HAL) -c -o $$@ $$<
-
-$1/.obj/system_hal.o: $$(SYSTEM) | $1/.obj
-	@echo "  CC    $$< (hal)"
-	$$(Q)$$(CC) $$(CFLAGS_HAL) -c -o $$@ $$<
-
-$1/.obj/startup_hal.o: $$(STARTUP) | $1/.obj
-	@echo "  AS    $$< (hal)"
-	$$(Q)$$(CC) $$(ASFLAGS) -c -o $$@ $$<
-
-# Link against the shared HAL library (built once); --gc-sections drops unused.
-$1/app_hal.elf: $1/.obj/hal_app.o $1/.obj/system_hal.o $1/.obj/startup_hal.o $$(HAL_LIB) $$(LDSCRIPT)
-	@echo "  LD    $$@"
-	$$(Q)$$(CC) $$(LDFLAGS) -Wl,-Map=$1/app_hal.map -o $$@ \
-		$1/.obj/hal_app.o $1/.obj/system_hal.o $1/.obj/startup_hal.o $$(HAL_LIB) 2>&1 \
-		| grep -vE '$$(LD_NOISE)' || true
-	$$(Q)test -f $$@
-
-$1/firmware_hal.bin: $1/app_hal.elf
-	@echo "  BIN   $$@"
-	$$(Q)$$(OBJCOPY) -O binary $$< $$@
-	$$(Q)$$(SIZE) $$<
-	@echo "  built $1 (bare + HAL)"
-
+# Each exercise needs its $1/.obj dir (declared once per exercise).
+define OBJDIR
 $1/.obj:
 	$$(Q)mkdir -p $$@
-
--include $1/.obj/bare.d $1/.obj/system_bare.d $1/.obj/startup_bare.d
--include $1/.obj/hal_app.d $1/.obj/system_hal.d $1/.obj/startup_hal.d
-endef
-$(foreach e,$(EXERCISES),$(eval $(call SINGLECORE_rules,$e)))
-
-# ---- per-dual-core-exercise rules ------------------------------------------
-# A dual-core exercise builds one image per core per available variant. Image
-# names carry both core and variant, e.g. firmware_cm4_bare.bin,
-# firmware_cm0p_hal.bin. The M4 links the M4 HAL library; the M0+ links the
-# cortex-m0plus HAL library (different instruction set -> different machine code).
-# Objects live in $1/.obj with unique suffixes so nothing collides. (Flashing
-# both banks + the M4's C2BOOT write actually runs the M0+ -- see CLAUDE.md.)
-
-# DUALCORE_bare: $1 = exercise dir. Builds the two _bare core images.
-define DUALCORE_bare
-$1/.obj/app_cm4_bare.o: $1/main_cm4_bare.c | $1/.obj
-	@echo "  CC    $$< (cm4 bare)"
-	$$(Q)$$(CC) $$(CFLAGS) -c -o $$@ $$<
-$1/.obj/system_cm4_bare.o: $$(SYSTEM) | $1/.obj
-	$$(Q)$$(CC) $$(CFLAGS) -c -o $$@ $$<
-$1/.obj/startup_cm4_bare.o: $$(STARTUP) | $1/.obj
-	$$(Q)$$(CC) $$(ASFLAGS) -c -o $$@ $$<
-$1/app_cm4_bare.elf: $1/.obj/app_cm4_bare.o $1/.obj/system_cm4_bare.o $1/.obj/startup_cm4_bare.o $$(LDSCRIPT)
-	@echo "  LD    $$@"
-	$$(Q)$$(CC) $$(LDFLAGS) -Wl,-Map=$1/app_cm4_bare.map -o $$@ $$(filter %.o,$$^) 2>&1 | grep -vE '$$(LD_NOISE)' || true
-	$$(Q)test -f $$@
-$1/firmware_cm4_bare.bin: $1/app_cm4_bare.elf
-	@echo "  BIN   $$@"
-	$$(Q)$$(OBJCOPY) -O binary $$< $$@
-
-$1/.obj/app_cm0p_bare.o: $1/main_cm0p_bare.c | $1/.obj
-	@echo "  CC    $$< (cm0+ bare)"
-	$$(Q)$$(CC) $$(CFLAGS_CM0) -c -o $$@ $$<
-$1/.obj/system_cm0p_bare.o: $$(SYSTEM) | $1/.obj
-	$$(Q)$$(CC) $$(CFLAGS_CM0) -c -o $$@ $$<
-$1/.obj/startup_cm0p_bare.o: $$(STARTUP_CM0) | $1/.obj
-	$$(Q)$$(CC) $$(ASFLAGS_CM0) -c -o $$@ $$<
-$1/app_cm0p_bare.elf: $1/.obj/app_cm0p_bare.o $1/.obj/system_cm0p_bare.o $1/.obj/startup_cm0p_bare.o $$(LDSCRIPT_CM0)
-	@echo "  LD    $$@"
-	$$(Q)$$(CC) $$(LDFLAGS_CM0) -Wl,-Map=$1/app_cm0p_bare.map -o $$@ $$(filter %.o,$$^) 2>&1 | grep -vE '$$(LD_NOISE)' || true
-	$$(Q)test -f $$@
-$1/firmware_cm0p_bare.bin: $1/app_cm0p_bare.elf
-	@echo "  BIN   $$@"
-	$$(Q)$$(OBJCOPY) -O binary $$< $$@
-	@echo "  built $1 (bare, both cores)"
-
-$1/.obj:
-	$$(Q)mkdir -p $$@
--include $1/.obj/app_cm4_bare.d $1/.obj/app_cm0p_bare.d
 endef
 
-# DUALCORE_hal: $1 = exercise dir. Builds the two _hal core images, each linking
-# the per-core HAL library. Only evaluated when the _hal sources exist.
-define DUALCORE_hal
-$1/.obj/app_cm4_hal.o: $1/main_cm4_hal.c | $1/.obj
-	@echo "  CC    $$< (cm4 hal)"
-	$$(Q)$$(CC) $$(CFLAGS_HAL) -c -o $$@ $$<
-$1/.obj/system_cm4_hal.o: $$(SYSTEM) | $1/.obj
-	$$(Q)$$(CC) $$(CFLAGS_HAL) -c -o $$@ $$<
-$1/.obj/startup_cm4_hal.o: $$(STARTUP) | $1/.obj
-	$$(Q)$$(CC) $$(ASFLAGS) -c -o $$@ $$<
-$1/app_cm4_hal.elf: $1/.obj/app_cm4_hal.o $1/.obj/system_cm4_hal.o $1/.obj/startup_cm4_hal.o $$(HAL_LIB) $$(LDSCRIPT)
-	@echo "  LD    $$@"
-	$$(Q)$$(CC) $$(LDFLAGS) -Wl,-Map=$1/app_cm4_hal.map -o $$@ $1/.obj/app_cm4_hal.o $1/.obj/system_cm4_hal.o $1/.obj/startup_cm4_hal.o $$(HAL_LIB) 2>&1 | grep -vE '$$(LD_NOISE)' || true
-	$$(Q)test -f $$@
-$1/firmware_cm4_hal.bin: $1/app_cm4_hal.elf
-	@echo "  BIN   $$@"
-	$$(Q)$$(OBJCOPY) -O binary $$< $$@
+# ---- single-core: one M4 image per variant (bare + HAL) --------------------
+$(foreach e,$(EXERCISES),$(eval $(call OBJDIR,$e)) \
+	$(eval $(call IMAGE,$e,bare,$e/main_bare.c,$(CFLAGS),$(ASFLAGS),$(LDFLAGS),$(STARTUP),$(LDSCRIPT),)) \
+	$(eval $(call IMAGE,$e,hal,$e/main_hal.c,$(CFLAGS_HAL),$(ASFLAGS),$(LDFLAGS),$(STARTUP),$(LDSCRIPT),$(HAL_LIB))))
 
-$1/.obj/app_cm0p_hal.o: $1/main_cm0p_hal.c | $1/.obj
-	@echo "  CC    $$< (cm0+ hal)"
-	$$(Q)$$(CC) $$(CFLAGS_HAL_CM0) -c -o $$@ $$<
-$1/.obj/system_cm0p_hal.o: $$(SYSTEM) | $1/.obj
-	$$(Q)$$(CC) $$(CFLAGS_HAL_CM0) -c -o $$@ $$<
-$1/.obj/startup_cm0p_hal.o: $$(STARTUP_CM0) | $1/.obj
-	$$(Q)$$(CC) $$(ASFLAGS_CM0) -c -o $$@ $$<
-$1/app_cm0p_hal.elf: $1/.obj/app_cm0p_hal.o $1/.obj/system_cm0p_hal.o $1/.obj/startup_cm0p_hal.o $$(HAL_LIB_CM0) $$(LDSCRIPT_CM0)
-	@echo "  LD    $$@"
-	$$(Q)$$(CC) $$(LDFLAGS_CM0) -Wl,-Map=$1/app_cm0p_hal.map -o $$@ $1/.obj/app_cm0p_hal.o $1/.obj/system_cm0p_hal.o $1/.obj/startup_cm0p_hal.o $$(HAL_LIB_CM0) 2>&1 | grep -vE '$$(LD_NOISE)' || true
-	$$(Q)test -f $$@
-$1/firmware_cm0p_hal.bin: $1/app_cm0p_hal.elf
-	@echo "  BIN   $$@"
-	$$(Q)$$(OBJCOPY) -O binary $$< $$@
-	@echo "  built $1 (hal, both cores)"
--include $1/.obj/app_cm4_hal.d $1/.obj/app_cm0p_hal.d
-endef
+# ---- dual-core: one image per core (M4/M0+) per variant (bare/HAL) ---------
+# The M0+ uses the cortex-m0plus flags/startup/linker and its own HAL library;
+# image names carry core+variant (cm4_bare, cm0p_hal, ...) so nothing collides.
+# (Flashing both banks + the M4's C2BOOT write runs the M0+ -- see CLAUDE.md.)
+$(foreach e,$(dualcore),$(eval $(call OBJDIR,$e)) \
+	$(eval $(call IMAGE,$e,cm4_bare,$e/main_cm4_bare.c,$(CFLAGS),$(ASFLAGS),$(LDFLAGS),$(STARTUP),$(LDSCRIPT),)) \
+	$(eval $(call IMAGE,$e,cm0p_bare,$e/main_cm0p_bare.c,$(CFLAGS_CM0),$(ASFLAGS_CM0),$(LDFLAGS_CM0),$(STARTUP_CM0),$(LDSCRIPT_CM0),)) \
+	$(eval $(call IMAGE,$e,cm4_hal,$e/main_cm4_hal.c,$(CFLAGS_HAL),$(ASFLAGS),$(LDFLAGS),$(STARTUP),$(LDSCRIPT),$(HAL_LIB))) \
+	$(eval $(call IMAGE,$e,cm0p_hal,$e/main_cm0p_hal.c,$(CFLAGS_HAL_CM0),$(ASFLAGS_CM0),$(LDFLAGS_CM0),$(STARTUP_CM0),$(LDSCRIPT_CM0),$(HAL_LIB_CM0))))
 
-$(foreach e,$(dualcore),$(eval $(call DUALCORE_bare,$e)))
-$(foreach e,$(dualcore),$(eval $(call DUALCORE_hal,$e)))
-
-# Convenience targets. A single-core bare name (e.g. `make 02_serial_counter`)
-# builds BOTH that exercise's images (bare + HAL). Full-path targets also work.
+# ---- convenience targets (build by bare name or full path) -----------------
 $(NAMES): %: $(SINGLEDIR)/%/firmware_bare.bin $(SINGLEDIR)/%/firmware_hal.bin
 $(EXERCISES): %: %/firmware_bare.bin %/firmware_hal.bin
-# Dual-core convenience targets build ALL available core/variant images. Emit one
-# rule per exercise so dual-bins' $(wildcard) sees the real path (a static pattern
-# rule would feed it a literal '%' and silently drop the HAL images).
 $(foreach e,$(dualcore),$(eval $(notdir $e): $(call dual-bins,$e)))
 $(foreach e,$(dualcore),$(eval $e: $(call dual-bins,$e)))
 .PHONY: $(NAMES) $(EXERCISES) $(DUALNAMES) $(dualcore)
