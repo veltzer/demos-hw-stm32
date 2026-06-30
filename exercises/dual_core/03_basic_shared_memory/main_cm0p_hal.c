@@ -10,8 +10,25 @@
 
 void SysTick_Handler(void) { HAL_IncTick(); }
 
-// The shared flag. Placed at SRAM2 base by the linker's ".shared" section.
-volatile uint32_t shared_flag __attribute__((section(".shared")));
+// ===========================================================================
+// CACHE-COHERENCY DEMO TOGGLE -- flip which of the two lines below is commented
+// ===========================================================================
+// The STM32WL55 cores have NO hardware data cache, so the only thing that can
+// make this core miss the M4's writes is the COMPILER caching the value in a
+// register instead of re-reading SRAM. `volatile` is what forbids that.
+//
+//   * COHERENT   (default): the `volatile` line active  -> M0+ re-reads SRAM,
+//                           tracks the M4's toggles, output flips 0<->1.
+//   * INCOHERENT (demo)   : the non-volatile line active -> at -O2 the compiler
+//                           hoists the read out of the loop (see main()), the
+//                           M0+ prints the boot value FOREVER no matter how many
+//                           times the M4 toggles the shared integer.
+//
+// To demo the bug: comment the volatile line, uncomment the plain one, rebuild.
+// ---------------------------------------------------------------------------
+volatile uint32_t shared_flag __attribute__((section(".shared")));  // COHERENT
+//          uint32_t shared_flag __attribute__((section(".shared")));  // INCOHERENT (demo)
+// ===========================================================================
 
 static UART_HandleTypeDef lpuart1;
 
@@ -46,7 +63,11 @@ int main(void) {
     uart_init();              // this core owns the UART here
 
     while (1) {
-        uart_puts(shared_flag ? "shared = 1\r\n" : "shared = 0\r\n");
+        // Snapshot then print. `volatile` forces this load to hit SRAM every
+        // iteration (tracks the M4); non-volatile lets -O2 hoist it out of the
+        // loop so the boot value prints forever -- the demo. (See toggle above.)
+        uint32_t v = shared_flag;
+        uart_puts(v ? "shared = 1\r\n" : "shared = 0\r\n");
         HAL_Delay(2000);      // 2 seconds
     }
 }

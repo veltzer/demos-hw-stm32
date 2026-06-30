@@ -182,7 +182,7 @@ all: $(BINS) $(DUALBINS)
 # Compile the HAL driver set ONCE (per core) into common/libhal_<cpu>.a; every
 # HAL app links it (the linker's --gc-sections then keeps only what it uses).
 $(HAL_LIBDIR)/%.o: $(HAL_DRV)/Src/%.c | $(HAL_LIBDIR)
-	@echo "  CC    $< (hal-lib)"
+	@echo "  CC    $< [M4] (hal-lib)"
 	$(Q)$(CC) $(CFLAGS_HALDRV) -c -o $@ $<
 
 $(HAL_LIBDIR):
@@ -196,7 +196,7 @@ $(HAL_LIB): $(HAL_LIBOBJS)
 
 # Same, compiled for the M0+ (cortex-m0plus) -> libhal_cm0.a.
 $(HAL_LIBDIR_CM0)/%.o: $(HAL_DRV)/Src/%.c | $(HAL_LIBDIR_CM0)
-	@echo "  CC    $< (hal-lib cm0+)"
+	@echo "  CC    $< [M0+] (hal-lib)"
 	$(Q)$(CC) $(CFLAGS_HALDRV_CM0) -c -o $@ $<
 
 $(HAL_LIBDIR_CM0):
@@ -213,24 +213,26 @@ $(HAL_LIB_CM0): $(HAL_LIBOBJS_CM0)
 # Every exercise image -- single/dual, bare/hal, M4/M0+ -- is one $(call) to it.
 #   $1 dir   $2 tag (e.g. bare, hal, cm4_bare)   $3 app source (.c)
 #   $4 CFLAGS   $5 ASFLAGS   $6 LDFLAGS   $7 startup .s   $8 linker .ld
-#   $9 HAL lib to link (empty for bare)
+#   $9 HAL lib to link (empty for bare)   $(10) core label (always "M4" or "M0+")
+# The core label is ALWAYS printed in the CC/LD/BIN lines so a build log never
+# leaves the target core ambiguous (single-core tags carry no core in them).
 # Outputs: $1/app_$2.elf, $1/firmware_$2.bin; objects in $1/.obj/*_$2.o.
 define IMAGE
 $1/.obj/app_$2.o: $3 | $1/.obj
-	@echo "  CC    $$< ($2)"
+	@echo "  CC    $$< [$(10)] ($2)"
 	$$(Q)$$(CC) $4 -c -o $$@ $$<
 $1/.obj/system_$2.o: $$(SYSTEM) | $1/.obj
 	$$(Q)$$(CC) $4 -c -o $$@ $$<
 $1/.obj/startup_$2.o: $7 | $1/.obj
 	$$(Q)$$(CC) $5 -c -o $$@ $$<
 $1/app_$2.elf: $1/.obj/app_$2.o $1/.obj/system_$2.o $1/.obj/startup_$2.o $9 $8
-	@echo "  LD    $$@"
+	@echo "  LD    $$@ [$(10)]"
 	$$(Q)$$(CC) $6 -T$8 -Wl,-Map=$1/app_$2.map -o $$@ \
 		$1/.obj/app_$2.o $1/.obj/system_$2.o $1/.obj/startup_$2.o $9 2>&1 \
 		| grep -vE '$$(LD_NOISE)' || true
 	$$(Q)test -f $$@
 $1/firmware_$2.bin: $1/app_$2.elf
-	@echo "  BIN   $$@"
+	@echo "  BIN   $$@ [$(10)]"
 	$$(Q)$$(OBJCOPY) -O binary $$< $$@
 -include $1/.obj/app_$2.d $1/.obj/system_$2.d $1/.obj/startup_$2.d
 endef
@@ -243,18 +245,18 @@ endef
 
 # ---- single-core: one M4 image per variant (bare + HAL) --------------------
 $(foreach e,$(EXERCISES),$(eval $(call OBJDIR,$e)) \
-	$(eval $(call IMAGE,$e,bare,$e/main_bare.c,$(CFLAGS),$(ASFLAGS),$(LDFLAGS),$(STARTUP),$(call ld-m4,$e),)) \
-	$(eval $(call IMAGE,$e,hal,$e/main_hal.c,$(CFLAGS_HAL),$(ASFLAGS),$(LDFLAGS),$(STARTUP),$(call ld-m4,$e),$(HAL_LIB))))
+	$(eval $(call IMAGE,$e,bare,$e/main_bare.c,$(CFLAGS),$(ASFLAGS),$(LDFLAGS),$(STARTUP),$(call ld-m4,$e),,M4)) \
+	$(eval $(call IMAGE,$e,hal,$e/main_hal.c,$(CFLAGS_HAL),$(ASFLAGS),$(LDFLAGS),$(STARTUP),$(call ld-m4,$e),$(HAL_LIB),M4)))
 
 # ---- dual-core: one image per core (M4/M0+) per variant (bare/HAL) ---------
 # The M0+ uses the cortex-m0plus flags/startup/linker and its own HAL library;
 # image names carry core+variant (cm4_bare, cm0p_hal, ...) so nothing collides.
 # (Flashing both banks + the M4's C2BOOT write runs the M0+ -- see CLAUDE.md.)
 $(foreach e,$(dualcore),$(eval $(call OBJDIR,$e)) \
-	$(eval $(call IMAGE,$e,cm4_bare,$e/main_cm4_bare.c,$(CFLAGS),$(ASFLAGS),$(LDFLAGS),$(STARTUP),$(call ld-m4,$e),)) \
-	$(eval $(call IMAGE,$e,cm0p_bare,$e/main_cm0p_bare.c,$(CFLAGS_CM0),$(ASFLAGS_CM0),$(LDFLAGS_CM0),$(STARTUP_CM0),$(call ld-cm0,$e),)) \
-	$(eval $(call IMAGE,$e,cm4_hal,$e/main_cm4_hal.c,$(CFLAGS_HAL),$(ASFLAGS),$(LDFLAGS),$(STARTUP),$(call ld-m4,$e),$(HAL_LIB))) \
-	$(eval $(call IMAGE,$e,cm0p_hal,$e/main_cm0p_hal.c,$(CFLAGS_HAL_CM0),$(ASFLAGS_CM0),$(LDFLAGS_CM0),$(STARTUP_CM0),$(call ld-cm0,$e),$(HAL_LIB_CM0))))
+	$(eval $(call IMAGE,$e,cm4_bare,$e/main_cm4_bare.c,$(CFLAGS),$(ASFLAGS),$(LDFLAGS),$(STARTUP),$(call ld-m4,$e),,M4)) \
+	$(eval $(call IMAGE,$e,cm0p_bare,$e/main_cm0p_bare.c,$(CFLAGS_CM0),$(ASFLAGS_CM0),$(LDFLAGS_CM0),$(STARTUP_CM0),$(call ld-cm0,$e),,M0+)) \
+	$(eval $(call IMAGE,$e,cm4_hal,$e/main_cm4_hal.c,$(CFLAGS_HAL),$(ASFLAGS),$(LDFLAGS),$(STARTUP),$(call ld-m4,$e),$(HAL_LIB),M4)) \
+	$(eval $(call IMAGE,$e,cm0p_hal,$e/main_cm0p_hal.c,$(CFLAGS_HAL_CM0),$(ASFLAGS_CM0),$(LDFLAGS_CM0),$(STARTUP_CM0),$(call ld-cm0,$e),$(HAL_LIB_CM0),M0+)))
 
 # ---- convenience targets (build by bare name or full path) -----------------
 $(NAMES): %: $(SINGLEDIR)/%/firmware_bare.bin $(SINGLEDIR)/%/firmware_hal.bin

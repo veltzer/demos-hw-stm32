@@ -12,8 +12,25 @@
 // compiler must re-read it from memory on every loop, not cache it in a
 // register.
 
-// The shared flag. Placed at SRAM2 base by the linker's ".shared" section.
-volatile uint32_t shared_flag __attribute__((section(".shared")));
+// ===========================================================================
+// CACHE-COHERENCY DEMO TOGGLE -- flip which of the two lines below is commented
+// ===========================================================================
+// The STM32WL55 cores have NO hardware data cache, so the only thing that can
+// make this core miss the M4's writes is the COMPILER caching the value in a
+// register instead of re-reading SRAM. `volatile` is what forbids that.
+//
+//   * COHERENT   (default): the `volatile` line active  -> M0+ re-reads SRAM,
+//                           tracks the M4's toggles, output flips 0<->1.
+//   * INCOHERENT (demo)   : the non-volatile line active -> at -O2 the compiler
+//                           hoists the read out of the loop (see main()), the
+//                           M0+ prints the boot value FOREVER no matter how many
+//                           times the M4 toggles the shared integer.
+//
+// To demo the bug: comment the volatile line, uncomment the plain one, rebuild.
+// ---------------------------------------------------------------------------
+volatile uint32_t shared_flag __attribute__((section(".shared")));  // COHERENT
+//          uint32_t shared_flag __attribute__((section(".shared")));  // INCOHERENT (demo)
+// ===========================================================================
 
 static void delay(volatile uint32_t count) { while (count--); }
 
@@ -45,8 +62,14 @@ int main(void) {
     LPUART1_Init();
 
     while (1) {
-        // Re-read the shared flag (volatile) -- the M4 may have toggled it.
-        LPUART1_SendString(shared_flag ? "shared = 1\r\n" : "shared = 0\r\n");
+        // Snapshot the shared flag, then print it. When `shared_flag` is
+        // `volatile` this load is forced to hit SRAM every iteration, so it
+        // tracks the M4's toggles. When it is NOT volatile, the compiler proves
+        // nothing in this loop writes `shared_flag` and hoists the load out of
+        // the loop entirely -- `v` is read once, before the loop, and printed
+        // forever: the cache-coherency bug. (See the toggle near the top.)
+        uint32_t v = shared_flag;
+        LPUART1_SendString(v ? "shared = 1\r\n" : "shared = 0\r\n");
         delay(2000000);       // ~2 seconds at the 4MHz default clock
     }
 }
