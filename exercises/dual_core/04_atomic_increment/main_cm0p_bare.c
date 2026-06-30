@@ -37,6 +37,7 @@ typedef struct {
     volatile uint32_t round;     // bumped by M4 to start each round
     volatile uint32_t m4_done;   // M4 finished its N increments this round
     volatile uint32_t m0p_done;  // M0+ finished its N increments this round
+    volatile uint32_t m0p_ready; // M0+ has booted & is waiting for round 1
 } shared_t;
 
 volatile shared_t shared __attribute__((section(".shared")));
@@ -111,8 +112,13 @@ int main(void) {
 
     LPUART1_Init();
 
-    // Track the round we last processed so we run exactly once per M4 round.
-    uint32_t last_round = shared.round;
+    // Startup handshake: sample the round counter while it is still 0 (the M4
+    // waits for `m0p_ready` before it ever bumps `round`), THEN announce we are
+    // ready. This closes the boot race where the M0+ could otherwise sample
+    // `round` after the M4 had already advanced it -- and then wait forever for
+    // a transition the M4 will not make until we acknowledge.
+    uint32_t last_round = shared.round;   // 0 here, guaranteed
+    shared.m0p_ready = 1;
 
     while (1) {
         // Wait for the M4 to start a new round (it zeroes counter, clears the

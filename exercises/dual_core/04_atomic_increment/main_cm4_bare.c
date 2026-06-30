@@ -25,6 +25,7 @@ typedef struct {
     volatile uint32_t round;     // bumped by M4 to start each round
     volatile uint32_t m4_done;   // M4 finished its N increments this round
     volatile uint32_t m0p_done;  // M0+ finished its N increments this round
+    volatile uint32_t m0p_ready; // M0+ has booted & is waiting for round 1
 } shared_t;
 
 #define SHARED ((volatile shared_t*)0x20008000UL)
