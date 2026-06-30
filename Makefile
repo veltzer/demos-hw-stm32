@@ -53,7 +53,7 @@ DUALDIR   := $(DIR)/dual_core
 COMMON  := $(DIR)/common
 # STM32CubeWL package (cloned by scripts/clone_cubewl.sh). Override to relocate.
 CUBEWL  ?= STM32CubeWL
-LDSCRIPT := $(COMMON)/STM32WL55JCIX_FLASH.ld
+LDSCRIPT := $(COMMON)/STM32WL55JCIX_FLASH_M4.ld
 STARTUP  := $(COMMON)/startup_stm32wl55jcix.s
 SYSTEM   := $(COMMON)/system_stm32wlxx.c
 
@@ -78,14 +78,19 @@ INCLUDES := \
 CFLAGS  := $(CPU) $(DEFS) $(INCLUDES) -Wall -Wextra -O2 -g3 \
 	-ffunction-sections -fdata-sections -MMD -MP
 ASFLAGS := $(CPU) -MMD -MP
-LDFLAGS := $(CPU) -T$(LDSCRIPT) -Wl,--gc-sections \
+# The linker SCRIPT is no longer baked in here: it is passed per image as the
+# IMAGE template's $8 (via -T), so an exercise can override it with its own .ld.
+LDFLAGS := $(CPU) -Wl,--gc-sections \
 	--specs=nano.specs --specs=nosys.specs
 
 # M0+ variants of the above (different cpu, defines, and linker script).
 CFLAGS_CM0  := $(CPU_CM0) $(DEFS_CM0) $(INCLUDES) -Wall -Wextra -O2 -g3 \
 	-ffunction-sections -fdata-sections -MMD -MP
 ASFLAGS_CM0 := $(CPU_CM0) -MMD -MP
-LDFLAGS_CM0 := $(CPU_CM0) -T$(LDSCRIPT_CM0) -Wl,--gc-sections \
+# As with LDFLAGS, the M0+ linker script is passed per image (IMAGE's $8), not
+# baked in, so a dual-core exercise can ship its own M0+ .ld (e.g. the shared
+# memory exercise reserves a .shared slot in SRAM2).
+LDFLAGS_CM0 := $(CPU_CM0) -Wl,--gc-sections \
 	--specs=nano.specs --specs=nosys.specs
 
 # ---- HAL support (for the single_core_hal exercises) -----------------------
@@ -154,6 +159,14 @@ dualcore   := $(sort $(patsubst %/,%,$(dir $(wildcard $(DUALDIR)/[0-9]*_*/main_c
 NAMES      := $(notdir $(EXERCISES))
 DUALNAMES  := $(notdir $(dualcore))
 
+# Per-exercise linker scripts: an exercise may ship its OWN .ld in its directory
+# to override the shared common one (e.g. 03_basic_shared_memory carries its own
+# M0+ script that reserves a .shared slot in SRAM2). These helpers pick the
+# exercise-local script if it exists, else fall back to the common default.
+#   $1 = exercise dir
+ld-m4  = $(if $(wildcard $1/STM32WL55JCIX_FLASH_M4.ld),$1/STM32WL55JCIX_FLASH_M4.ld,$(LDSCRIPT))
+ld-cm0 = $(if $(wildcard $1/STM32WL55JCIX_FLASH_CM0PLUS.ld),$1/STM32WL55JCIX_FLASH_CM0PLUS.ld,$(LDSCRIPT_CM0))
+
 # Each single-core exercise produces two images: bare-metal and HAL.
 BINS := $(foreach e,$(EXERCISES),$(e)/firmware_bare.bin $(e)/firmware_hal.bin)
 # Each dual-core exercise produces FOUR images: both cores, each as bare + HAL.
@@ -212,7 +225,7 @@ $1/.obj/startup_$2.o: $7 | $1/.obj
 	$$(Q)$$(CC) $5 -c -o $$@ $$<
 $1/app_$2.elf: $1/.obj/app_$2.o $1/.obj/system_$2.o $1/.obj/startup_$2.o $9 $8
 	@echo "  LD    $$@"
-	$$(Q)$$(CC) $6 -Wl,-Map=$1/app_$2.map -o $$@ \
+	$$(Q)$$(CC) $6 -T$8 -Wl,-Map=$1/app_$2.map -o $$@ \
 		$1/.obj/app_$2.o $1/.obj/system_$2.o $1/.obj/startup_$2.o $9 2>&1 \
 		| grep -vE '$$(LD_NOISE)' || true
 	$$(Q)test -f $$@
@@ -230,18 +243,18 @@ endef
 
 # ---- single-core: one M4 image per variant (bare + HAL) --------------------
 $(foreach e,$(EXERCISES),$(eval $(call OBJDIR,$e)) \
-	$(eval $(call IMAGE,$e,bare,$e/main_bare.c,$(CFLAGS),$(ASFLAGS),$(LDFLAGS),$(STARTUP),$(LDSCRIPT),)) \
-	$(eval $(call IMAGE,$e,hal,$e/main_hal.c,$(CFLAGS_HAL),$(ASFLAGS),$(LDFLAGS),$(STARTUP),$(LDSCRIPT),$(HAL_LIB))))
+	$(eval $(call IMAGE,$e,bare,$e/main_bare.c,$(CFLAGS),$(ASFLAGS),$(LDFLAGS),$(STARTUP),$(call ld-m4,$e),)) \
+	$(eval $(call IMAGE,$e,hal,$e/main_hal.c,$(CFLAGS_HAL),$(ASFLAGS),$(LDFLAGS),$(STARTUP),$(call ld-m4,$e),$(HAL_LIB))))
 
 # ---- dual-core: one image per core (M4/M0+) per variant (bare/HAL) ---------
 # The M0+ uses the cortex-m0plus flags/startup/linker and its own HAL library;
 # image names carry core+variant (cm4_bare, cm0p_hal, ...) so nothing collides.
 # (Flashing both banks + the M4's C2BOOT write runs the M0+ -- see CLAUDE.md.)
 $(foreach e,$(dualcore),$(eval $(call OBJDIR,$e)) \
-	$(eval $(call IMAGE,$e,cm4_bare,$e/main_cm4_bare.c,$(CFLAGS),$(ASFLAGS),$(LDFLAGS),$(STARTUP),$(LDSCRIPT),)) \
-	$(eval $(call IMAGE,$e,cm0p_bare,$e/main_cm0p_bare.c,$(CFLAGS_CM0),$(ASFLAGS_CM0),$(LDFLAGS_CM0),$(STARTUP_CM0),$(LDSCRIPT_CM0),)) \
-	$(eval $(call IMAGE,$e,cm4_hal,$e/main_cm4_hal.c,$(CFLAGS_HAL),$(ASFLAGS),$(LDFLAGS),$(STARTUP),$(LDSCRIPT),$(HAL_LIB))) \
-	$(eval $(call IMAGE,$e,cm0p_hal,$e/main_cm0p_hal.c,$(CFLAGS_HAL_CM0),$(ASFLAGS_CM0),$(LDFLAGS_CM0),$(STARTUP_CM0),$(LDSCRIPT_CM0),$(HAL_LIB_CM0))))
+	$(eval $(call IMAGE,$e,cm4_bare,$e/main_cm4_bare.c,$(CFLAGS),$(ASFLAGS),$(LDFLAGS),$(STARTUP),$(call ld-m4,$e),)) \
+	$(eval $(call IMAGE,$e,cm0p_bare,$e/main_cm0p_bare.c,$(CFLAGS_CM0),$(ASFLAGS_CM0),$(LDFLAGS_CM0),$(STARTUP_CM0),$(call ld-cm0,$e),)) \
+	$(eval $(call IMAGE,$e,cm4_hal,$e/main_cm4_hal.c,$(CFLAGS_HAL),$(ASFLAGS),$(LDFLAGS),$(STARTUP),$(call ld-m4,$e),$(HAL_LIB))) \
+	$(eval $(call IMAGE,$e,cm0p_hal,$e/main_cm0p_hal.c,$(CFLAGS_HAL_CM0),$(ASFLAGS_CM0),$(LDFLAGS_CM0),$(STARTUP_CM0),$(call ld-cm0,$e),$(HAL_LIB_CM0))))
 
 # ---- convenience targets (build by bare name or full path) -----------------
 $(NAMES): %: $(SINGLEDIR)/%/firmware_bare.bin $(SINGLEDIR)/%/firmware_hal.bin

@@ -1,15 +1,18 @@
 /*
 *****************************************************************************
-**  Linker script for the STM32WL55 Cortex-M0+ core (CPU2).
+**  Linker script for the STM32WL55 Cortex-M0+ core (CPU2) -- EXERCISE-LOCAL.
 **
-**  Same layout as the Cortex-M4 script (STM32WL55JCIX_FLASH_M4.ld) but placed in
-**  the SECOND flash bank and SRAM2, so the two cores' images don't overlap:
+**  This is the 03_basic_shared_memory variant: it is identical to the common
+**  M0+ script (exercises/common/STM32WL55JCIX_FLASH_CM0PLUS.ld) EXCEPT it adds
+**  a reserved ".shared" section pinned to the base of SRAM2 (0x20008000). That
+**  is the inter-core shared-memory slot this exercise needs; no other exercise
+**  defines it, so the section lives here rather than in the common script.
+**
+**  The Makefile uses an exercise-local *.ld in preference to the common one, so
+**  dropping this file here is all it takes to give this exercise the slot.
 **
 **    M4  (CPU1): FLASH bank 1 @ 0x08000000 (128K),  SRAM1 @ 0x20000000 (32K)
 **    M0+ (CPU2): FLASH bank 2 @ 0x08020000 (128K),  SRAM2 @ 0x20008000 (32K)
-**
-**  (The 256K flash is split into two 128K banks; bank 2 base = 0x08020000.
-**   SRAM2 base = 0x20008000 per stm32wl55xx.h.)
 **
 **  Distribution: as-is, no warranty.
 *****************************************************************************
@@ -110,6 +113,20 @@ SECTIONS
     PROVIDE_HIDDEN (__fini_array_end = .);
     . = ALIGN(4);
   } >FLASH
+
+  /* Inter-core shared memory: a fixed, reserved slot at the very base of SRAM2
+   * (0x20008000). SRAM2 is reachable from BOTH cores over the bus matrix, so a
+   * variable placed here by the M0+ image can be read/written by the M4 image
+   * at the same absolute address. Carving it out of the linker (rather than
+   * leaving it to .data/.bss) guarantees nothing else is ever allocated on top
+   * of it, and keeps its address stable across rebuilds. */
+  .shared (NOLOAD) :
+  {
+    . = ALIGN(4);
+    KEEP(*(.shared))
+    KEEP(*(.shared*))
+    . = ALIGN(4);
+  } >RAM
 
   /* Used by the startup to initialize data */
   _sidata = LOADADDR(.data);

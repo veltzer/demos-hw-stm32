@@ -1,36 +1,31 @@
-// 02_semaphores -- M0+ (CPU2) side, HAL. Compare with main_cm0p_bare.c.
+// 03_basic_shared_memory -- M0+ (CPU2) side, HAL. Compare with main_cm0p_bare.c.
 //
-// Mirrors the M4 side but drives the IPCC channel from the CPU2 (RX) direction.
-// The LPUART1 is shared -- the M4 already initialised it -- so the M0+ only
-// builds a UART handle to transmit on it.
+// Owns the shared integer: defined here in the ".shared" section, pinned to
+// SRAM2 base (0x20008000) by the M0+ linker, so the M4 reaches it at the same
+// absolute address. The M4 toggles it on button presses; this core prints it
+// every 2 seconds. `volatile` is essential -- the value is changed by the OTHER
+// core, so it must be re-read from memory each time.
 #include "stm32wlxx_hal.h"
 #include <string.h>
 
 void SysTick_Handler(void) { HAL_IncTick(); }
 
+// The shared flag. Placed at SRAM2 base by the linker's ".shared" section.
+volatile uint32_t shared_flag __attribute__((section(".shared")));
+
 static UART_HandleTypeDef lpuart1;
-static IPCC_HandleTypeDef hipcc;
 
-static void uart_puts(const char* s) {
-    HAL_UART_Transmit(&lpuart1, (uint8_t*)s, strlen(s), HAL_MAX_DELAY);
-}
+static void uart_init(void) {
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+    __HAL_RCC_LPUART1_CLK_ENABLE();
+    GPIO_InitTypeDef g = {0};
+    g.Pin = GPIO_PIN_2 | GPIO_PIN_3;
+    g.Mode = GPIO_MODE_AF_PP;
+    g.Pull = GPIO_NOPULL;
+    g.Speed = GPIO_SPEED_FREQ_LOW;
+    g.Alternate = GPIO_AF8_LPUART1;
+    HAL_GPIO_Init(GPIOA, &g);
 
-// IPCC channel 2 used as a binary semaphore, from the CPU2 (RX) side.
-static void acquire_lock(void) {
-    while (HAL_IPCC_GetChannelStatus(&hipcc, IPCC_CHANNEL_2, IPCC_CHANNEL_DIR_RX)
-           == IPCC_CHANNEL_STATUS_OCCUPIED) {
-    }
-    HAL_IPCC_NotifyCPU(&hipcc, IPCC_CHANNEL_2, IPCC_CHANNEL_DIR_RX);
-}
-static void release_lock(void) {
-    HAL_IPCC_NotifyCPU(&hipcc, IPCC_CHANNEL_2, IPCC_CHANNEL_DIR_RX);
-}
-
-int main(void) {
-    HAL_Init();
-
-    // The UART pins/clock are already set up by the M4 (shared peripheral); we
-    // only need a handle to transmit through it.
     lpuart1.Instance        = LPUART1;
     lpuart1.Init.BaudRate   = 9600;
     lpuart1.Init.WordLength = UART_WORDLENGTH_8B;
@@ -39,15 +34,19 @@ int main(void) {
     lpuart1.Init.Mode       = UART_MODE_TX_RX;
     lpuart1.Init.HwFlowCtl  = UART_HWCONTROL_NONE;
     HAL_UART_Init(&lpuart1);
+}
 
-    __HAL_RCC_IPCC_CLK_ENABLE();
-    hipcc.Instance = IPCC;
-    HAL_IPCC_Init(&hipcc);
+static void uart_puts(const char* s) {
+    HAL_UART_Transmit(&lpuart1, (uint8_t*)s, strlen(s), HAL_MAX_DELAY);
+}
+
+int main(void) {
+    HAL_Init();
+    shared_flag = 0;          // defined starting value
+    uart_init();              // this core owns the UART here
 
     while (1) {
-        acquire_lock();
-        uart_puts("Message from Cortex-M0+!\r\n");
-        release_lock();
-        HAL_Delay(750);
+        uart_puts(shared_flag ? "shared = 1\r\n" : "shared = 0\r\n");
+        HAL_Delay(2000);      // 2 seconds
     }
 }

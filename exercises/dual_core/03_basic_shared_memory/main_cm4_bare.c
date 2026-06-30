@@ -1,61 +1,52 @@
 #include "stm32wl55xx.h"
-#include <string.h>
 
-// CPU1 (Cortex-M4) side of the semaphore exercise.
+// 03_basic_shared_memory -- M4 (CPU1) side, bare metal.
 //
-// The M4 and M0+ both want to print over the shared LPUART1. We use an IPCC
-// channel as a simple binary semaphore (a hardware mutex): a core "takes" the
-// lock by setting the channel-occupied flag and "releases" it by clearing it.
-// (This is a teaching simplification -- a real mutex over IPCC also has to
-//  cope with the other core racing on the same flag; HSEM is the proper tool.)
+// The two cores share ONE integer that lives in SRAM2 (reachable from both
+// cores over the bus matrix). The M0+ image defines it in a reserved ".shared"
+// slot pinned to the base of SRAM2 by its linker script (see
+// exercises/common/STM32WL55JCIX_FLASH_CM0PLUS.ld), so its address is fixed at
+// 0x20008000. The M4 has no symbol for it -- it just pokes that absolute
+// address through a volatile pointer.
+//
+//   M4  : watch user button B1 (PA0, active-low). On each press, toggle the
+//         shared integer 0<->1.
+//   M0+ : print the shared integer over the UART every 2 seconds.
+//
+// The M4 owns the bootstrap: it releases the M0+ (PWR.C2BOOT) so CPU2 runs.
 
-void delay(volatile uint32_t count) { while (count--); }
+// Base of SRAM2 -- the reserved ".shared" slot. Must match the M0+ linker.
+#define SHARED_FLAG (*(volatile uint32_t*)0x20008000UL)
 
-// --- minimal LPUART1 bring-up (PA2 TX @ 9600, routed to the ST-LINK VCP) ---
-void LPUART1_Init(void) {
-    RCC->AHB2ENR  |= RCC_AHB2ENR_GPIOAEN;
-    RCC->APB1ENR2 |= RCC_APB1ENR2_LPUART1EN;
-
-    GPIOA->MODER &= ~(GPIO_MODER_MODE2 | GPIO_MODER_MODE3);
-    GPIOA->MODER |= (GPIO_MODER_MODE2_1 | GPIO_MODER_MODE3_1);
-    GPIOA->AFR[0] &= ~(GPIO_AFRL_AFSEL2 | GPIO_AFRL_AFSEL3);
-    GPIOA->AFR[0] |= (8 << GPIO_AFRL_AFSEL2_Pos) | (8 << GPIO_AFRL_AFSEL3_Pos);
-
-    LPUART1->BRR = 106667;                 // 256 * 4MHz / 9600
-    LPUART1->CR1 |= USART_CR1_TE | USART_CR1_UE;
-}
-
-void LPUART1_SendString(const char* str) {
-    for (size_t i = 0; i < strlen(str); i++) {
-        // No TX FIFO enabled -> poll TXE_TXFNF, not TXFE.
-        while (!(LPUART1->ISR & USART_ISR_TXE_TXFNF));
-        LPUART1->TDR = str[i];
-    }
-}
-
-// --- IPCC channel 2 used as a binary semaphore, from the CPU1 side ---
-void acquire_lock(void) {
-    // Spin until channel 2 is free (the CPU1->CPU2 occupied flag is clear),
-    // then take it by setting the status.
-    while (IPCC->C1TOC2SR & IPCC_C1TOC2SR_CH2F);
-    IPCC->C1SCR = IPCC_C1SCR_CH2S;
-}
-
-void release_lock(void) {
-    // Clear the channel from the CPU1 side -> resource free again.
-    IPCC->C1SCR = IPCC_C1SCR_CH2C;
-}
+static void delay(volatile uint32_t count) { while (count--); }
 
 int main(void) {
-    LPUART1_Init();
+    // Make sure the shared flag has a defined starting value before we boot the
+    // M0+. (The M0+ also clears it, but doing it here too removes any doubt
+    // about who initialises shared state -- the writer/owner side.)
+    SHARED_FLAG = 0;
 
-    // Enable IPCC clock
-    RCC->AHB3ENR |= RCC_AHB3ENR_IPCCEN;
+    // Boot the M0+: SBRV already points at flash bank 2 where the M0+ image is
+    // linked, so setting C2BOOT starts CPU2 from its reset vector. PWR is always
+    // clocked on the STM32WL, so we just write CR4.
+    PWR->CR4 |= PWR_CR4_C2BOOT;
+
+    // B1 = PA0 as input with a pull-up: idle HIGH, reads LOW while pressed.
+    RCC->AHB2ENR |= RCC_AHB2ENR_GPIOAEN;
+    GPIOA->MODER &= ~GPIO_MODER_MODE0;                 // input
+    GPIOA->PUPDR &= ~GPIO_PUPDR_PUPD0;
+    GPIOA->PUPDR |=  GPIO_PUPDR_PUPD0_0;               // pull-up
+
+    // Edge detect: remember the previous level so we act once per press, on the
+    // HIGH->LOW transition (the moment the button goes down).
+    int prev = (GPIOA->IDR & GPIO_IDR_ID0) ? 1 : 0;
 
     while (1) {
-        acquire_lock();
-        LPUART1_SendString("Message from Cortex-M4!\r\n");
-        release_lock();
-        delay(500000); // wait a bit before trying again
+        int level = (GPIOA->IDR & GPIO_IDR_ID0) ? 1 : 0;
+        if (prev == 1 && level == 0) {                 // press edge
+            SHARED_FLAG ^= 1u;                         // 0<->1
+        }
+        prev = level;
+        delay(20000);                                  // crude debounce / poll
     }
 }
