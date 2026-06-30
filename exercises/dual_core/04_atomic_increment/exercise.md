@@ -29,10 +29,31 @@ Both cores read 100, both write 101 -- two increments happened, but the counter
 only advanced by one. That is a **lost update**. Over millions of increments
 the losses pile up and are easy to measure.
 
-The atomic version uses the Cortex-M exclusive monitor (LDREX/STREX) via the
-GCC built-in `__atomic_fetch_add(&counter, 1, __ATOMIC_SEQ_CST)`. STREX fails if
-the other core touched the location since our LDREX, and the built-in retries
-until it succeeds -- so no increment is ever lost.
+The "atomic" version serialises the increment with a **hardware semaphore**: a
+core takes an HSEM lock, does the plain `counter++`, then releases. Only one
+core can hold the lock at a time, so the two cores' load/modify/store sequences
+can never interleave and no increment is lost.
+
+### Why HSEM and not LDREX/STREX
+
+The obvious instinct is to use the Cortex-M exclusive monitor (LDREX/STREX),
+e.g. via `__atomic_fetch_add`. That does **not** work on this chip across the
+two cores:
+
+- The **Cortex-M0+ is ARMv6-M and has no LDREX/STREX at all.** A bare
+  `__atomic_fetch_add` on a shared 32-bit word fails to compile/link for the
+  M0+ (the compiler emits a call to a libatomic helper that isn't there).
+- Even on the M4, LDREX/STREX guards against *another master on the same local
+  monitor*; lock-free atomics shared between two *different* cores on the
+  STM32WL are meant to go through the **HSEM** peripheral, which ST provides
+  exactly for M4<->M0+ mutual exclusion.
+
+So the correct, portable-across-both-cores tool here is HSEM. Each core uses the
+**1-step lock**: reading `HSEM->RLR[id]` atomically attempts the lock and reads
+back as `(LOCK | this core's COREID)` iff the lock is now held by this core;
+spin until that holds. Release by writing the core's COREID to `HSEM->R[id]`.
+The semaphore index (`HSEM_ID = 0`) and the AHB3 clock-enable (M4 via
+`RCC->AHB3ENR`, M0+ via `RCC->C2AHB3ENR`) must be set on both cores.
 
 ## What each round does
 
@@ -115,4 +136,5 @@ data cache, and `volatile` already forces every access to hit SRAM -- that was
 `03`'s lesson). This is a **read-modify-write atomicity** bug: even with every
 load and store going straight to memory, the non-atomic `load; add; store`
 sequence is interruptible by the other core between its steps. `volatile` does
-NOT make `counter++` atomic; only LDREX/STREX (the atomic built-in) does.
+NOT make `counter++` atomic; on this chip only serialising it through the HSEM
+hardware semaphore does (the M0+ has no LDREX/STREX to do it lock-free).

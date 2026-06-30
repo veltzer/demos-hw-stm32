@@ -2,7 +2,9 @@
 //
 // Both cores hammer the SAME integer (`counter`) in shared SRAM2, each
 // incrementing it N times per round. A non-atomic `counter++` loses increments
-// to the inter-core load/modify/store interleave; an atomic add does not.
+// to the inter-core load/modify/store interleave; serialising the ++ with the
+// HSEM hardware semaphore does not. (The M0+ has no LDREX/STREX, so HSEM is the
+// chip's mechanism for M4<->M0+ mutual exclusion.)
 //
 //   M4  : drive the round handshake, increment its N-share, watch button B1
 //         (PA0, active-low) and toggle RACY<->ATOMIC on each press.
@@ -13,6 +15,7 @@
 // pointer; the M0+ image DEFINES it there. The layout must match the M0+'s.
 #include "stm32wlxx_hal.h"
 #include "stm32wlxx_ll_pwr.h"
+#include "stm32wlxx_ll_hsem.h"
 
 void SysTick_Handler(void) { HAL_IncTick(); }
 
@@ -28,13 +31,20 @@ typedef struct {
 
 #define SHARED ((volatile shared_t*)0x20008000UL)
 
-// Do N increments of the shared counter, atomically or not per `atomic`.
+// HSEM semaphore index used to guard `counter`. Both cores must agree on it.
+#define HSEM_ID 0u
+
+// Do N increments of the shared counter, serialised by HSEM or not per `atomic`.
+// LL_HSEM_1StepLock returns 0 when the lock is held by us, so spin until 0.
 static void do_increments(int atomic) {
     if (atomic) {
-        for (uint32_t i = 0; i < N; i++)
-            __atomic_fetch_add(&SHARED->counter, 1u, __ATOMIC_SEQ_CST);
+        for (uint32_t i = 0; i < N; i++) {
+            while (LL_HSEM_1StepLock(HSEM, HSEM_ID)) { /* spin */ }
+            SHARED->counter = SHARED->counter + 1u;
+            LL_HSEM_ReleaseLock(HSEM, HSEM_ID, 0);
+        }
     } else {
-        // Deliberately non-atomic: load; add; store, interruptible by the M0+.
+        // Deliberately unguarded: load; add; store, interruptible by the M0+.
         for (uint32_t i = 0; i < N; i++)
             SHARED->counter = SHARED->counter + 1u;
     }
@@ -42,6 +52,7 @@ static void do_increments(int atomic) {
 
 int main(void) {
     HAL_Init();
+    __HAL_RCC_HSEM_CLK_ENABLE();   // this core's AHB3 gate for the HSEM
 
     // Defined starting state before booting CPU2.
     SHARED->counter  = 0;
