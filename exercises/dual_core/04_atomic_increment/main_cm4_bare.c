@@ -63,11 +63,12 @@ static void do_increments(int atomic) {
 int main(void) {
     // Initialise the whole shared block to a defined state before booting CPU2,
     // so the M0+ never observes garbage on its first read.
-    SHARED->counter  = 0;
-    SHARED->mode     = 0;            // start in RACY mode (the interesting one)
-    SHARED->round    = 0;
-    SHARED->m4_done  = 0;
-    SHARED->m0p_done = 0;
+    SHARED->counter   = 0;
+    SHARED->mode      = 0;           // start in RACY mode (the interesting one)
+    SHARED->round     = 0;
+    SHARED->m4_done   = 0;
+    SHARED->m0p_done  = 0;
+    SHARED->m0p_ready = 0;
 
     // Clock the HSEM peripheral from the M4 (AHB3). The M0+ clocks it from its
     // own C2AHB3ENR; both cores need it for the shared semaphore to work.
@@ -84,6 +85,12 @@ int main(void) {
     GPIOA->PUPDR |=  GPIO_PUPDR_PUPD0_0;               // pull-up
 
     int prev = (GPIOA->IDR & GPIO_IDR_ID0) ? 1 : 0;
+
+    // Wait for the M0+ to finish booting and sample round 0 before we start
+    // bumping `round`. Without this the M0+ could sample `round` after our first
+    // bump and then wait forever for a transition we never make (we would be
+    // blocked on its `m0p_done`). This handshake makes round 1 race-free.
+    while (!SHARED->m0p_ready) { /* spin */ }
 
     while (1) {
         // ---- start a new round ------------------------------------------

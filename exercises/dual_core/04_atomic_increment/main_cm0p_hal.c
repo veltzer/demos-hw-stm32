@@ -28,6 +28,7 @@ typedef struct {
     volatile uint32_t round;     // bumped by M4 to start each round
     volatile uint32_t m4_done;   // M4 finished its N increments this round
     volatile uint32_t m0p_done;  // M0+ finished its N increments this round
+    volatile uint32_t m0p_ready; // M0+ has booted & is waiting for round 1
 } shared_t;
 
 volatile shared_t shared __attribute__((section(".shared")));
@@ -83,7 +84,10 @@ int main(void) {
     __HAL_RCC_HSEM_CLK_ENABLE();   // this core's AHB3 gate for the HSEM
     uart_init();                   // this core owns the UART
 
-    uint32_t last_round = shared.round;
+    // Startup handshake: sample `round` while it is still 0 (the M4 waits for
+    // `m0p_ready` before bumping it), then announce ready. Closes the boot race.
+    uint32_t last_round = shared.round;   // 0 here, guaranteed
+    shared.m0p_ready = 1;
 
     while (1) {
         // Wait for the M4 to start a new round (it clears counter + done-flags,

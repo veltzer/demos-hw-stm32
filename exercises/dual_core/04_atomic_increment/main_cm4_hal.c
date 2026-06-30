@@ -27,6 +27,7 @@ typedef struct {
     volatile uint32_t round;     // bumped by M4 to start each round
     volatile uint32_t m4_done;   // M4 finished its N increments this round
     volatile uint32_t m0p_done;  // M0+ finished its N increments this round
+    volatile uint32_t m0p_ready; // M0+ has booted & is waiting for round 1
 } shared_t;
 
 #define SHARED ((volatile shared_t*)0x20008000UL)
@@ -55,11 +56,12 @@ int main(void) {
     __HAL_RCC_HSEM_CLK_ENABLE();   // this core's AHB3 gate for the HSEM
 
     // Defined starting state before booting CPU2.
-    SHARED->counter  = 0;
-    SHARED->mode     = 0;        // start in RACY mode (the interesting one)
-    SHARED->round    = 0;
-    SHARED->m4_done  = 0;
-    SHARED->m0p_done = 0;
+    SHARED->counter   = 0;
+    SHARED->mode      = 0;       // start in RACY mode (the interesting one)
+    SHARED->round     = 0;
+    SHARED->m4_done   = 0;
+    SHARED->m0p_done  = 0;
+    SHARED->m0p_ready = 0;
 
     LL_PWR_EnableBootC2();       // release the M0+
 
