@@ -107,6 +107,14 @@ address `0x20008000`. The struct holds:
 | `m4_done`        | M4         | M4 finished its N increments this round  |
 | `m0p_done`       | M0+        | M0+ finished its N increments this round |
 | `round`          | M4         | round number, bumped to start each round |
+| `m0p_ready`      | M0+        | M0+ has booted and sampled round 0       |
+
+The `m0p_ready` flag closes a **boot race**: the M4 must not bump `round` until
+the M0+ has booted (via C2BOOT, which takes time) and sampled `round` while it
+is still 0. Otherwise the M0+ could sample `round` *after* the first bump, then
+wait forever for a transition the M4 never makes (the M4 being blocked on
+`m0p_done`) -- a deadlock. So the M0+ sets `m0p_ready` right after init, and the
+M4 spins on it before starting round 1.
 
 Everything is `volatile` because the OTHER core mutates it. Note the handshake
 is race-free *without* atomics even in RACY mode: each done-flag is written by
