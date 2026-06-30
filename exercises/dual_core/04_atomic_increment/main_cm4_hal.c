@@ -75,6 +75,10 @@ int main(void) {
 
     GPIO_PinState prev = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0);
 
+    // Wait for the M0+ to boot and sample round 0 before we start bumping
+    // `round`, else the M0+ could miss round 1 and both cores deadlock.
+    while (!SHARED->m0p_ready) { /* spin */ }
+
     while (1) {
         // ---- start a new round: clear state, THEN bump round -------------
         SHARED->counter  = 0;
