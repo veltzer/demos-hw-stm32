@@ -1,4 +1,4 @@
-#  Basic shared memory exercise
+# Basic shared memory exercise
 
 create two pieces of software (running on M4,M0+) that share memory.
 The shared memory is just one integer that starts off as 0.

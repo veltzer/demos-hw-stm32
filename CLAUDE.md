@@ -40,8 +40,9 @@ compile fails on a missing `stm32wl55xx.h`. Override the location with
 `make CUBEWL=/path/to/STM32CubeWL`.
 
 What stays in the repo (`exercises/common/`) is only what is genuinely *ours*:
-the customized startup (`startup_stm32wl55jcix*.s`), linker scripts (the M4 one
-uses 128K bank 1 so the M0+ image fits in bank 2), `system_stm32wlxx.c`, and the
+the customized startup (`startup_stm32wl55jcix*.s`), linker scripts
+(`STM32WL55JCIX_FLASH_M4.ld` uses 128K bank 1 so the M0+ image fits in bank 2;
+`STM32WL55JCIX_FLASH_CM0PLUS.ld` is the M0+ one), `system_stm32wlxx.c`, and the
 HAL config (`stm32wlxx_hal_conf.h`). CMSIS and the HAL drivers are
 taken from the clone (its versions are newer than the previously-vendored
 copies). Each `main_hal.c` defines its own `SysTick_Handler` (forwarding to
@@ -75,6 +76,13 @@ which is split into two trees plus shared support:
 - Each exercise links its `main*.c` against the shared CMSIS / startup / linker
   support in `exercises/common/` (copied from the CubeIDE `workspace/blink`
   project; the `workspace/` tree itself is generated IDE output).
+- **Per-exercise linker scripts:** an exercise may ship its own
+  `STM32WL55JCIX_FLASH_M4.ld` and/or `STM32WL55JCIX_FLASH_CM0PLUS.ld` in its
+  directory; the Makefile (`ld-m4`/`ld-cm0` helpers) uses the exercise-local
+  script if present, else the common one. This is how
+  `dual_core/03_basic_shared_memory` reserves a `.shared` slot at SRAM2 base
+  (`0x20008000`) for its inter-core integer without affecting any other
+  exercise — only that exercise carries its own M0+ script.
 - Target MCU is the Cortex-M4 core: `-mcpu=cortex-m4 -mthumb -mfloat-abi=soft`
   (the chip has **no FPU**, `__FPU_PRESENT == 0`), with `-DSTM32WL55xx
   -DCORE_CM4`.
