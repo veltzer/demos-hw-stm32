@@ -1,4 +1,4 @@
-# Proto-OS (a cooperative scheduler)
+# Proto-OS with per-task stacks (a cooperative scheduler)
 
 A "proto operating system": the smallest thing that still deserves the name
 *kernel*. A **cooperative round-robin scheduler** context-switches between
@@ -7,6 +7,12 @@ several tasks using `setjmp`/`longjmp` -- the exact technique from
 
 Two tasks blink **LD1 (blue, PB15)**, cooperating by yielding the CPU to a
 scheduler that resumes the next one where it last left off.
+
+This is the **robust** half of a pair. Its sibling,
+`single_core/09_os_coop_single_stack`, is the naive `coop1.cc` port where the
+tasks jump straight to each other on a **single shared stack**; this one adds a
+real scheduler and a **separate stack per task**. Read them together to see why
+the extra machinery is needed on bare metal.
 
 ## What a proto-OS is (and isn't)
 
@@ -106,6 +112,6 @@ The scheduler itself is identical in both variants -- `setjmp`/`longjmp` are
 plain C, not HAL calls -- so only the task bodies (register writes vs
 `HAL_GPIO_TogglePin`/`HAL_Delay`) differ.
 
-Build both images with `make 09_proto_os`. Flash one with
-`scripts/flash_exercise.sh 09_proto_os bare` (or `hal`). Comparing the two shows
+Build both images with `make 10_os_coop_two_stacks`. Flash one with
+`scripts/flash_exercise.sh 10_os_coop_two_stacks bare` (or `hal`). Comparing the two shows
 what the HAL does for you -- and what it hides.

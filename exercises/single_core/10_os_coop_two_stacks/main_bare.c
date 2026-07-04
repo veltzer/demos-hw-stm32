@@ -1,4 +1,4 @@
-// 09_proto_os -- bare metal.
+// 10_os_coop_two_stacks -- bare metal.
 //
 // A tiny "proto operating system": a cooperative round-robin scheduler that
 // context-switches between two tasks with setjmp/longjmp -- exactly the trick

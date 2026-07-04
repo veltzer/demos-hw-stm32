@@ -1,4 +1,4 @@
-// 09_proto_os -- HAL. Compare with main_bare.c.
+// 10_os_coop_two_stacks -- HAL. Compare with main_bare.c.
 //
 // Same cooperative proto-OS (a setjmp/longjmp round-robin scheduler over a task
 // table), but the tasks drive the LED and time through the HAL instead of raw
