@@ -10,6 +10,7 @@ sudo apt install -y \
 	minicom \
 	tio \
 	make \
+	g++ \
 	whiptail \
 	dialog \
 	pass \

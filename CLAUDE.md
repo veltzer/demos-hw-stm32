@@ -14,6 +14,7 @@ command-to-package mapping (keep this in sync if scripts gain new tools):
 | `minicom`                               | `minicom`                |
 | `tio`                                   | `tio`                    |
 | `make`                                  | `make`                   |
+| `g++` (host build of `examples/*.cc`)   | `g++`                    |
 | `whiptail`                              | `whiptail`               |
 | `dialog`                                | `dialog`                 |
 | `pass`                                  | `pass`                   |
