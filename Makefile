@@ -34,6 +34,11 @@ CC      := $(PREFIX)gcc
 OBJCOPY := $(PREFIX)objcopy
 SIZE    := $(PREFIX)size
 
+# Host C++ compiler for the standalone examples under examples/ (these are
+# ordinary POSIX host programs -- setjmp/ucontext demos -- NOT target code, so
+# they build with the native compiler, not the ARM cross-toolchain above).
+HOSTCXX ?= g++
+
 # ---- board / cpu -----------------------------------------------------------
 # STM32WL55 Cortex-M4 has NO FPU (__FPU_PRESENT == 0): soft float, no -mfpu.
 CPU     := -mcpu=cortex-m4 -mthumb -mfloat-abi=soft
@@ -175,8 +180,22 @@ dual-bins = $1/firmware_cm4_bare.bin $1/firmware_cm0p_bare.bin \
 	$1/firmware_cm4_hal.bin $1/firmware_cm0p_hal.bin
 DUALBINS := $(foreach e,$(dualcore),$(call dual-bins,$e))
 
-.PHONY: all list clean
-all: $(BINS) $(DUALBINS)
+# ---- standalone host examples ----------------------------------------------
+# Every .cc under examples/ builds to a same-named .elf beside it (the .elf
+# extension means the existing gitignore's `*.elf` rule covers the outputs).
+# Discovered from the filesystem, like the exercises.
+EXAMPLE_SRCS := $(wildcard examples/*.cc)
+EXAMPLE_ELFS := $(EXAMPLE_SRCS:.cc=.elf)
+
+examples/%.elf: examples/%.cc
+	@echo "  CXX   $< [host]"
+	$(Q)$(HOSTCXX) -Wall -O2 -o $@ $<
+
+.PHONY: all list clean examples
+all: $(BINS) $(DUALBINS) $(EXAMPLE_ELFS)
+
+# Build just the host examples.
+examples: $(EXAMPLE_ELFS)
 
 # ---- shared HAL library ----------------------------------------------------
 # Compile the HAL driver set ONCE (per core) into common/libhal_<cpu>.a; every
@@ -270,9 +289,11 @@ list:
 	@for e in $(NAMES); do echo "  $$e"; done
 	@echo "dual_core (M4 + M0+, bare; some also HAL):"
 	@for e in $(DUALNAMES); do echo "  $$e"; done
+	@echo "examples (standalone host programs):"
+	@for e in $(EXAMPLE_ELFS); do echo "  $$(basename $$e .elf)"; done
 
 clean:
 	$(Q)find $(DIR) -name '*.bin' -o -name '*.elf' -o -name '*.map' | xargs -r rm -f
 	$(Q)rm -rf $(SINGLEDIR)/*/.obj $(DUALDIR)/*/.obj $(HAL_LIBDIR) $(HAL_LIBDIR_CM0)
-	$(Q)rm -f $(HAL_LIB) $(HAL_LIB_CM0)
+	$(Q)rm -f $(HAL_LIB) $(HAL_LIB_CM0) $(EXAMPLE_ELFS)
 	@echo "cleaned"
