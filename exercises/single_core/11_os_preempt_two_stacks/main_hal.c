@@ -21,23 +21,18 @@ typedef struct {
 tcb_t tasks[NUM_TASKS];
 int   current = -1;
 
-static void task_fast(void) {
+// Both tasks blink LD1 at the SAME rate as the cooperative exercises (09/10);
+// preemption -- not a differing rate -- is what this exercise demonstrates.
+static void task_blink(void) {
     while (1) {
         HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_15); // LD1
-        HAL_Delay(100);
-    }
-}
-
-static void task_slow(void) {
-    while (1) {
-        HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_15); // LD1
-        HAL_Delay(400);
+        HAL_Delay(250);
     }
 }
 
 static void (*const task_entries[NUM_TASKS])(void) = {
-    task_fast,
-    task_slow,
+    task_blink,
+    task_blink,
 };
 
 static void task_init_stack(int i, void (*entry)(void)) {

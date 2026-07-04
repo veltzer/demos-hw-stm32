@@ -49,30 +49,22 @@ int   current = -1;               // running task index (-1 before first switch)
 static void delay(volatile uint32_t n) { while (n--); }
 
 // --- The two tasks. NOTE: neither yields. They just loop. Preemption is the
-//     only reason both ever get to run. They blink LD1 (PB15) at different
-//     rates, so the LED shows a compound pattern no single task produces. ---
+//     only reason both ever get to run. Both blink LD1 (PB15) at the SAME rate
+//     as the cooperative exercises (09/10) -- the point here is not a different
+//     pattern but that two never-yielding loops share the CPU at all. ---
 
-static void task_fast(void) {
+static void task_blink(void) {
     while (1) {
         GPIOB->BSRR = GPIO_BSRR_BS15; // LD1 on
-        delay(200000);
+        delay(400000);
         GPIOB->BSRR = GPIO_BSRR_BR15; // LD1 off
-        delay(200000);
-    }
-}
-
-static void task_slow(void) {
-    while (1) {
-        GPIOB->BSRR = GPIO_BSRR_BS15; // LD1 on
-        delay(800000);
-        GPIOB->BSRR = GPIO_BSRR_BR15; // LD1 off
-        delay(800000);
+        delay(400000);
     }
 }
 
 static void (*const task_entries[NUM_TASKS])(void) = {
-    task_fast,
-    task_slow,
+    task_blink,
+    task_blink,
 };
 
 // Build the initial exception stack frame for a task, so the first time PendSV

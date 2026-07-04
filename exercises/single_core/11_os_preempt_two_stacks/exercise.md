@@ -7,9 +7,10 @@ cooperation at all** -- each just loops forever -- yet both run, because every
 timer tick the kernel snatches the CPU from whoever holds it and hands it to the
 next task. That is what makes an OS *preemptive*.
 
-Both tasks blink **LD1 (blue, PB15)** at different rates, so the LED shows a
-compound pattern no single task produces -- visible proof that two
-never-yielding loops are being time-sliced onto one CPU.
+Both tasks blink **LD1 (blue, PB15)** at the same rate as the cooperative
+exercises (`09`/`10`), so all three look identical on the board on purpose. The
+point here is not a different pattern but the mechanism: two loops that *never
+yield* are being time-sliced onto one CPU by the timer alone.
 
 ## Why `setjmp`/`longjmp` is not enough anymore
 
