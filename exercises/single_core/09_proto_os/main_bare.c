@@ -1,4 +1,4 @@
-// 05_proto_os -- M4 (CPU1) side, bare metal.
+// 09_proto_os -- bare metal.
 //
 // A tiny "proto operating system": a cooperative round-robin scheduler that
 // context-switches between two tasks with setjmp/longjmp -- exactly the trick
@@ -16,10 +16,9 @@
 // yielding often enough. (Preemption -- a timer forcibly switching tasks -- is
 // the next step up, and a much bigger one.)
 //
-// Both cores run their own independent copy of this proto-OS:
-//   M4  (this file) schedules two tasks that blink LD1 (blue,  PB15).
-//   M0+ (main_cm0p_bare.c) schedules two tasks that blink LD2 (green, PB9).
-// Seeing both LEDs blink proves two independent schedulers running in parallel.
+// This single-core version schedules two tasks that blink LD1 (blue, PB15).
+// Compare with single_core/07_cooperative_scheduling, which does the same idea
+// with a plain task-array loop and no real context switch.
 #include "stm32wl55xx.h"
 #include <setjmp.h>
 
@@ -90,12 +89,7 @@ static void scheduler(void) {
 }
 
 int main(void) {
-    // Boot the M0+ (CPU2) so it can run its own proto-OS. SBRV already points
-    // at flash bank 2; a single C2BOOT write releases the second core.
-    PWR->CR4 |= PWR_CR4_C2BOOT;
-
-    // LD1 = PB15 push-pull output (user LEDs live on port B). Atomic BSRR
-    // writes below mean we never touch PB9, which belongs to the M0+.
+    // LD1 = PB15 push-pull output (user LEDs live on port B).
     RCC->AHB2ENR |= RCC_AHB2ENR_GPIOBEN;
     GPIOB->MODER &= ~GPIO_MODER_MODE15_1;
     GPIOB->MODER |= GPIO_MODER_MODE15_0;

@@ -1,18 +1,12 @@
-# Proto-OS (a cooperative scheduler on each core)
+# Proto-OS (a cooperative scheduler)
 
 A "proto operating system": the smallest thing that still deserves the name
-*kernel*. Each core runs a **cooperative round-robin scheduler** that
-context-switches between several tasks using `setjmp`/`longjmp` -- the exact
-technique from `examples/coop1.cc`, now on real hardware and running on **both
-cores at once**.
+*kernel*. A **cooperative round-robin scheduler** context-switches between
+several tasks using `setjmp`/`longjmp` -- the exact technique from
+`examples/coop1.cc`, now on real hardware.
 
-- **M4 (CPU1)** runs a scheduler over **two** tasks that blink **LD1 (blue,
-  PB15)**.
-- **M0+ (CPU2)** runs its **own** scheduler over **three** tasks that blink
-  **LD2 (green, PB9)** faster.
-
-Two LEDs blinking is proof that two independent schedulers are running in
-genuine parallel, one per CPU.
+Two tasks blink **LD1 (blue, PB15)**, cooperating by yielding the CPU to a
+scheduler that resumes the next one where it last left off.
 
 ## What a proto-OS is (and isn't)
 
@@ -31,7 +25,7 @@ The kernel here is tiny but real, and has the three pieces every scheduler has:
 What it is **not**: preemptive. There is no timer forcibly interrupting a task;
 a task keeps the CPU until it *chooses* to `yield()`. Correctness therefore
 depends on every task yielding often enough -- a task that never yields hangs
-its whole core. Adding preemption (a `SysTick` interrupt that saves/restores
+the whole system. Adding preemption (a `SysTick` interrupt that saves/restores
 context and switches tasks behind their back) is the natural next exercise and a
 much larger step. Compare with `single_core/07_cooperative_scheduling`, which
 does the same idea with a plain task-array loop and no real context switch.
@@ -56,24 +50,16 @@ task continues exactly where it left off.
 
 ## Two solutions: bare-metal and HAL
 
-Each core has both a bare-metal and a HAL solution, so there are four sources:
+This exercise is solved two ways, both in this folder:
 
-- `main_cm4_bare.c` / `main_cm0p_bare.c` -- register level.
-- `main_cm4_hal.c` / `main_cm0p_hal.c` -- LED and timing via the HAL.
+- `main_bare.c` -- bare metal: configure and drive the peripheral registers
+  directly.
+- `main_hal.c` -- the same behaviour using ST's HAL (`HAL_*` calls).
 
 The scheduler itself is identical in both variants -- `setjmp`/`longjmp` are
 plain C, not HAL calls -- so only the task bodies (register writes vs
 `HAL_GPIO_TogglePin`/`HAL_Delay`) differ.
 
-`make 05_proto_os` builds all four images (`firmware_cm4_bare.bin`,
-`firmware_cm0p_bare.bin`, `firmware_cm4_hal.bin`, `firmware_cm0p_hal.bin`). The
-HAL is compiled twice, once per core, because the two CPUs have different
-instruction sets.
-
-## Running it
-
-Both cores must be flashed (M4 -> bank 1 at `0x08000000`, M0+ -> bank 2 at
-`0x08020000`), then reset. `SBRV` already points at bank 2, so the M4's
-`C2BOOT` write is enough to start the M0+ -- no option-byte changes needed.
-
-    scripts/flash_exercise.sh 05_proto_os bare   # or: hal
+Build both images with `make 09_proto_os`. Flash one with
+`scripts/flash_exercise.sh 09_proto_os bare` (or `hal`). Comparing the two shows
+what the HAL does for you -- and what it hides.
