@@ -11,7 +11,7 @@ are. A button press switches between the two modes live.
 `counter++` is **not** one indivisible operation. On Cortex-M it compiles to
 three instructions:
 
-```
+```text
 LDR   r0, [counter]   ; read
 ADDS  r0, r0, #1       ; modify
 STR   r0, [counter]   ; write
@@ -20,7 +20,7 @@ STR   r0, [counter]   ; write
 When BOTH cores run that sequence against the same address, their
 load/modify/store can interleave:
 
-```
+```text
 M4 : LDR  (reads 100) .................. STR (writes 101)
 M0+:        LDR (reads 100) STR (writes 101)
 ```
@@ -64,15 +64,15 @@ counter *should* reach `2 * N` per round. A round is:
 2. Each core increments `counter` exactly `N` times (atomically or not,
    depending on `mode`), then sets ITS OWN done-flag and spins.
 3. The M0+ waits until BOTH done-flags are set, then prints:
-   - `mode`     : `RACY` (non-atomic) or `ATOMIC`
+   - `mode` : `RACY` (non-atomic) or `ATOMIC`
    - `expected` : `2 * N`
-   - `actual`   : the value `counter` actually reached
-   - `lost`     : `expected - actual` (how many increments vanished)
+   - `actual` : the value `counter` actually reached
+   - `lost` : `expected - actual` (how many increments vanished)
 4. M4 sees both flags set, begins the next round.
 
 Expected output (numbers illustrative):
 
-```
+```text
 mode=RACY   expected=2000000 actual=1374251 lost=625749
 mode=RACY   expected=2000000 actual=1402190 lost=597810
 <button press>

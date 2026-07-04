@@ -41,7 +41,7 @@ Three hardware features carry the design:
 
 ### The context switch, in PendSV
 
-```
+```text
 save:    R4-R11 -> current task's PSP,  store PSP into tasks[current].sp
 pick:    current = (current + 1) % NUM_TASKS          // round robin
 restore: PSP <- tasks[current].sp,  pop R4-R11
