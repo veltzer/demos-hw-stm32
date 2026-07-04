@@ -53,15 +53,15 @@ copies). Each `main_hal.c` defines its own `SysTick_Handler` (forwarding to
 `Makefile` lives at the repo root and builds the exercises under `exercises/`,
 which is split into two trees plus shared support:
 
-- `exercises/singlecore/NN_name/` — one `main.c`, built into a single M4 image.
-- `exercises/dualcore/NN_name/` — `main_cm4.c` + `main_cm0p.c`, built into two
+- `exercises/single_core/NN_name/` — one `main.c`, built into a single M4 image.
+- `exercises/dual_core/NN_name/` — `main_cm4.c` + `main_cm0p.c`, built into two
   images, one per core (see below).
 - `exercises/common/` — shared CMSIS / startup / linker support for both.
 
 - The set of buildable exercises is **discovered from the filesystem**, not
   hardcoded: the directory tree IS the classification. Everything under
-  `singlecore/` with a `main.c` builds one M4 image; everything under
-  `dualcore/` with a `main_cm4.c` builds two. Sourceless dirs (e.g. a
+  `single_core/` with a `main.c` builds one M4 image; everything under
+  `dual_core/` with a `main_cm4.c` builds two. Sourceless dirs (e.g. a
   write-up-only exercise) are ignored, since discovery keys off the source
   files' presence.
 - Dual-core exercises build an M4 image (`app_cm4.elf`/`firmware_cm4.bin`) from
@@ -154,7 +154,7 @@ installer from st.com, **fully unattended** (no AI / no manual browser steps).
 - The `exercises/*/*/main*.c` are bare register-level programs. Some have
   genuine bugs that the build surfaces; the build system is a plain compiler and
   does not paper over them.
-- Dual-core exercises (under `exercises/dualcore/`, numbered from `00`) now
+- Dual-core exercises (under `exercises/dual_core/`, numbered from `00`) now
   **build** both cores' images (M4 + M0+) via the from-scratch M0+
   startup/linker under `exercises/common/`. They are **not flashed/run** yet:
   that needs the `C2BOOT`/`SBRV` option bytes set so the M0+ boots from flash

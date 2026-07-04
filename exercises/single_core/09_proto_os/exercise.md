@@ -12,10 +12,11 @@ scheduler that resumes the next one where it last left off.
 
 The kernel here is tiny but real, and has the three pieces every scheduler has:
 
-1. **Task control blocks** -- a table of tasks. For a cooperative kernel the
-   whole "context" that must be saved and restored is a `jmp_buf`: `setjmp`
-   snapshots the callee-saved registers, the stack pointer and the return
-   address; `longjmp` puts them back.
+1. **Task control blocks** -- a table of tasks. Each holds a `jmp_buf` context
+   and, crucially, its **own private stack** (see below). For a cooperative
+   kernel the "context" that must be saved and restored is that `jmp_buf`:
+   `setjmp` snapshots the callee-saved registers, the stack pointer and the
+   return address; `longjmp` puts them back.
 2. **A scheduler** -- a dead-simple round robin. It picks the next task and
    either jumps to its entry point (first time) or `longjmp`s back to where the
    task last yielded.
@@ -47,6 +48,51 @@ static void yield(void) {
 The scheduler resumes a previously-run task with `longjmp(tasks[i].context, 1)`,
 which re-enters the matching `setjmp` inside that task's `yield()` -- so the
 task continues exactly where it left off.
+
+## Every task needs its own stack
+
+This is the part that makes it a *real* context switch and not a toy, and it is
+easy to get wrong. `setjmp`/`longjmp` save and restore the stack **pointer** --
+they do **not** save the stack **contents**. So if two tasks that suspend
+mid-execution shared a single stack, here is what happens:
+
+1. Task A runs, pushes its local variables and its `yield()` call frame onto the
+   stack, then `setjmp`s (saving an SP that points into that live frame) and
+   yields.
+2. Task B is dispatched and runs on the *same* stack, from the *same* SP -- so
+   it overwrites the very bytes holding task A's suspended frame.
+3. The scheduler later `longjmp`s back into task A. Its SP is restored, but the
+   memory it points at is now task B's garbage. Task A resumes on a corrupted
+   stack: undefined behaviour -- in practice the program hangs (here, the LED
+   froze steady-on).
+
+The cure is a **separate stack per task**. Each task control block carries its
+own stack buffer:
+
+```c
+typedef struct {
+    jmp_buf  context;
+    int      started;
+    uint32_t stack[256];   // 1 KiB private stack, per task
+} tcb_t;
+```
+
+The first time the scheduler dispatches a task it does not just `call` the
+entry function -- it must first point the CPU's stack pointer at that task's
+private stack, then enter the task:
+
+```c
+// full-descending stack: start at the TOP of the buffer and grow downward
+uint32_t *top = &tasks[current].stack[256];
+__asm volatile("mov sp, %0\n blx %1\n" :: "r"(top), "r"(entry) : "memory");
+```
+
+From then on each task lives entirely on its own stack, so suspending one never
+disturbs another, and `longjmp` always restores an SP that still points at valid
+memory. This is exactly what a "real" RTOS does -- every thread gets its own
+stack; a cooperative kernel is no exception. (The single shared stack works fine
+in `single_core/07_cooperative_scheduling` only because those tasks run to
+completion each tick and never suspend, so there is no frame to preserve.)
 
 ## Two solutions: bare-metal and HAL
 

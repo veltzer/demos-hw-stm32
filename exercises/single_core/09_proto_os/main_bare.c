@@ -24,18 +24,40 @@
 
 #define NUM_TASKS 2
 
-// A task control block. For a cooperative kernel the entire "context" we need
-// to save/restore is a jmp_buf: setjmp snapshots the callee-saved registers,
-// stack pointer and return address; longjmp restores them. started tells the
-// scheduler whether this task has run its one-time setjmp bootstrap yet.
+// A task control block. For a cooperative kernel the "context" we save/restore
+// once a task is running is a jmp_buf: setjmp snapshots the callee-saved
+// registers, stack pointer and return address; longjmp restores them. started
+// tells the scheduler whether this task has run its one-time bootstrap yet.
+//
+// CRUCIAL: every task needs its OWN stack. setjmp/longjmp only saves/restores
+// the stack POINTER, not the stack CONTENTS -- so if two suspendable tasks
+// shared one stack, resuming task A would land on memory that task B has since
+// overwritten (undefined behaviour; in practice the LED sticks). Each task
+// therefore gets a private stack here, and we switch SP to it on first entry.
 typedef struct {
-    jmp_buf context;
-    int     started;
+    jmp_buf  context;
+    int      started;
+    uint32_t stack[256];          // 1 KiB private stack, per task
 } tcb_t;
 
 static tcb_t   tasks[NUM_TASKS];
 static jmp_buf scheduler_context; // where a yielding task jumps back to
 static int     current;           // index of the task currently running
+
+// Jump into a brand-new task on its OWN stack. We set SP to the top of the
+// task's private stack (full-descending, 8-byte aligned) and branch to its
+// entry. The entry loops forever and never returns, so we never need to
+// restore the scheduler's SP here -- control leaves only via yield()'s longjmp.
+static void __attribute__((noreturn))
+start_on_stack(void (*entry)(void), uint32_t *stack_top) {
+    __asm volatile(
+        "mov sp, %0\n"
+        "blx %1\n"
+        :
+        : "r"(stack_top), "r"(entry)
+        : "memory");
+    __builtin_unreachable();
+}
 
 static void delay(volatile uint32_t n) { while (n--); }
 
@@ -74,14 +96,24 @@ static void (*const task_entries[NUM_TASKS])(void) = {
 
 // scheduler(): dead-simple round robin. Pick the next task; if it has never
 // run, jump to its entry point (which loops forever, yielding); otherwise
-// resume it where it last yielded. Control comes back here each time a task
-// calls yield(), because yield() longjmps into scheduler_context.
+// resume it where it last yielded.
+//
+// The setjmp(scheduler_context) MUST live here, at the top of the loop -- that
+// is the point yield() longjmps back to. Every time a task yields, control
+// re-enters right here (setjmp returns non-zero), we fall through, pick the
+// next task, and dispatch it. Putting this setjmp in main() before calling
+// scheduler() would be wrong: yield() would return into main() *after* the
+// scheduler frame, skipping the loop entirely and hanging on the first yield.
 static void scheduler(void) {
+    setjmp(scheduler_context);        // (re)entry point for every yield()
     while (1) {
         current = (current + 1) % NUM_TASKS;
         if (!tasks[current].started) {
             tasks[current].started = 1;
-            task_entries[current]();      // never returns (task loops + yields)
+            // First run: enter the task on its OWN stack (top of the array,
+            // full-descending). It loops forever + yields, never returns.
+            uint32_t *top = &tasks[current].stack[256];
+            start_on_stack(task_entries[current], top);
         } else {
             longjmp(tasks[current].context, 1); // resume where it yielded
         }
@@ -94,13 +126,9 @@ int main(void) {
     GPIOB->MODER &= ~GPIO_MODER_MODE15_1;
     GPIOB->MODER |= GPIO_MODER_MODE15_0;
 
-    // Start the kernel. The scheduler runs forever, switching between tasks;
-    // setjmp here just records "the scheduler" so yield() has somewhere to go
-    // back to -- though scheduler() never actually returns.
+    // Start the kernel. scheduler() runs forever, switching between tasks.
     current = -1;                 // so the first (current+1) selects task 0
-    if (setjmp(scheduler_context) == 0) {
-        scheduler();
-    }
+    scheduler();
 
     while (1); // unreachable
 }
