@@ -12,34 +12,39 @@
 // Cooperative switching could use setjmp/longjmp because the switch happened at
 // a known point (inside yield()), where the compiler had already spilled
 // whatever it cared about. Preemption interrupts a task at an ARBITRARY
-// instruction, so we must save/restore the FULL register file, and we must do
-// it from an interrupt. The Cortex-M4 is built for exactly this:
+// instruction, so we must save/restore the FULL register file, and from an
+// interrupt. The Cortex-M4 is built for exactly this:
 //
 //   - Each task runs in Thread mode on its own PSP (process stack pointer);
-//     the kernel and interrupt handlers run on the MSP (main stack pointer).
+//     the kernel/ISRs run on the MSP (main stack pointer).
 //   - On any exception the CPU AUTO-stacks R0-R3, R12, LR, PC, xPSR onto the
-//     current (process) stack. We only have to save/restore the rest: R4-R11.
+//     current (process) stack. We only save/restore the rest by hand: R4-R11.
 //   - PendSV is a dedicated, lowest-priority exception meant for context
-//     switching. SysTick fires periodically and just PENDS PendSV; PendSV then
-//     does the actual stack swap once no higher-priority ISR is pending.
+//     switching. SysTick fires periodically and just PENDS PendSV; PendSV does
+//     the actual stack swap once no higher-priority ISR is pending.
 //
-// So the plan is: build a fake initial exception frame on each task's stack (so
-// "returning" into it starts the task cleanly), then let PendSV swap PSP
-// between tasks on every tick.
+// The launch is elegant: main() prepares each task's stack, sets current = -1,
+// and starts SysTick. The very first PendSV sees "no outgoing task" (current
+// < 0), skips the save step, and simply loads task 0 -- returning into it on
+// the PSP. main()'s own context is then abandoned (never scheduled again).
 #include "stm32wl55xx.h"
 
 #define NUM_TASKS 2
 
 // A task control block. For a PREEMPTIVE kernel the whole saved context lives
-// on the task's own stack; the only thing the TCB must remember between
-// switches is where that stack's top currently is (the task's PSP).
+// on the task's own stack; between switches the TCB only needs to remember
+// where that stack's top currently is (the task's PSP). sp MUST be field 0 --
+// the PendSV assembly indexes tasks[i] and dereferences it as the sp directly.
 typedef struct {
     uint32_t *sp;                 // saved process stack pointer for this task
     uint32_t  stack[256];         // 1 KiB private stack, per task
 } tcb_t;
 
-static tcb_t tasks[NUM_TASKS];
-static int   current = -1;        // index of the running task (-1 before start)
+// Non-static (external linkage) because the PendSV assembly refers to these by
+// symbol name (`ldr rN, =tasks` / `=current`); a static symbol could be
+// localized or elided and the assembler reference would not resolve.
+tcb_t tasks[NUM_TASKS];
+int   current = -1;               // running task index (-1 before first switch)
 
 static void delay(volatile uint32_t n) { while (n--); }
 
@@ -70,67 +75,64 @@ static void (*const task_entries[NUM_TASKS])(void) = {
     task_slow,
 };
 
-// Build the initial exception stack frame for a task, so that the very first
-// time PendSV "returns" into it, the CPU pops a valid frame and starts running
-// task_entries[i] in Thread mode. Layout matches the hardware auto-stacked
-// frame, top-of-stack downward: xPSR, PC, LR, R12, R3, R2, R1, R0, then our
-// software-saved R4-R11 below it.
+// Build the initial exception stack frame for a task, so the first time PendSV
+// "returns" into it, the CPU pops a valid frame and starts running its entry in
+// Thread mode. Layout matches the hardware frame, top-of-stack downward:
+// xPSR, PC, LR, R12, R3, R2, R1, R0, then our software-saved R4-R11 below.
 static void task_init_stack(int i, void (*entry)(void)) {
     uint32_t *sp = &tasks[i].stack[256];   // full-descending: start at the top
     *(--sp) = 0x01000000u;                 // xPSR: Thumb bit set (required)
-    *(--sp) = (uint32_t)entry;             // PC: task entry point
-    *(--sp) = 0xFFFFFFFDu;                 // LR: EXC_RETURN? no -- dummy return
+    *(--sp) = (uint32_t)entry & ~1u;       // PC: task entry (bit0 clear in frame)
+    *(--sp) = 0xFFFFFFFFu;                 // LR: tasks never return; trap if they do
     *(--sp) = 0;                           // R12
     *(--sp) = 0;                           // R3
     *(--sp) = 0;                           // R2
     *(--sp) = 0;                           // R1
     *(--sp) = 0;                           // R0
-    // Software-saved registers R4-R11 (PendSV pops these before returning).
-    for (int r = 0; r < 8; r++) *(--sp) = 0;
+    for (int r = 0; r < 8; r++) *(--sp) = 0; // R4-R11
     tasks[i].sp = sp;
 }
 
-// PendSV: the actual context switch. Naked so we control the whole prologue /
+// PendSV: the actual context switch. Naked so we own the whole prologue/
 // epilogue. On entry the CPU has already auto-stacked the outgoing task's
 // R0-R3,R12,LR,PC,xPSR onto its PSP. We save R4-R11 too, stash PSP into the
-// current TCB, pick the next task, load its PSP, restore its R4-R11, and return
-// with EXC_RETURN=0xFFFFFFFD so the CPU pops the frame and resumes in Thread
-// mode on the process stack.
+// current TCB (unless there is no outgoing task yet), advance current round
+// robin, load the next task's PSP, restore its R4-R11, and return with
+// EXC_RETURN=0xFFFFFFFD so the CPU resumes it in Thread mode on the PSP.
 void __attribute__((naked)) PendSV_Handler(void) {
     __asm volatile(
+        "  ldr   r3, =current       \n"
+        "  ldr   r2, [r3]           \n" // r2 = current
+        "  cmp   r2, #0             \n"
+        "  blt   1f                 \n" // current < 0 -> first switch, nothing to save
         "  mrs   r0, psp            \n" // r0 = outgoing PSP
-        "  cbz   r0, 1f             \n" // first switch ever? no task to save -> skip save
-        "  stmdb r0!, {r4-r11}      \n" // push R4-R11, r0 now points at new top
-        "  ldr   r1, =current       \n"
-        "  ldr   r2, [r1]           \n" // r2 = current index
-        "  ldr   r3, =tasks         \n"
+        "  stmdb r0!, {r4-r11}      \n" // push R4-R11
+        "  ldr   r1, =tasks         \n"
         "  mov   r12, %[stride]     \n"
-        "  mul   r2, r2, r12        \n"
-        "  str   r0, [r3, r2]       \n" // tasks[current].sp = r0  (sp is field 0)
+        "  mul   r12, r2, r12       \n"
+        "  str   r0, [r1, r12]      \n" // tasks[current].sp = r0
         "1:                         \n"
-        "  ldr   r1, =current       \n"
-        "  ldr   r2, [r1]           \n"
         "  adds  r2, r2, #1         \n"
-        "  cmp   r2, %[n]           \n" // wrap: if (++current == NUM_TASKS) current = 0
+        "  cmp   r2, %[n]           \n"
         "  it    ge                 \n"
-        "  movge r2, #0             \n"
-        "  str   r2, [r1]           \n" // current = next
-        "  ldr   r3, =tasks         \n"
+        "  movge r2, #0             \n" // wrap round robin
+        "  str   r2, [r3]           \n" // current = next
+        "  ldr   r1, =tasks         \n"
         "  mov   r12, %[stride]     \n"
-        "  mul   r2, r2, r12        \n"
-        "  ldr   r0, [r3, r2]       \n" // r0 = tasks[current].sp
+        "  mul   r12, r2, r12       \n"
+        "  ldr   r0, [r1, r12]      \n" // r0 = tasks[current].sp
         "  ldmia r0!, {r4-r11}      \n" // restore R4-R11
         "  msr   psp, r0            \n" // PSP = new task's stack
-        "  ldr   lr, =0xFFFFFFFD    \n" // EXC_RETURN: Thread mode, use PSP
-        "  bx    lr                 \n"
+        "  ldr   r0, =0xFFFFFFFD    \n"
+        "  bx    r0                 \n" // return into Thread mode, using PSP
         :
         : [stride] "i" (sizeof(tcb_t)), [n] "i" (NUM_TASKS)
         : "memory");
 }
 
 // SysTick: the heartbeat. It does almost nothing -- just set the PendSV pending
-// bit so the actual switch happens in PendSV (at lowest priority, after any
-// other ISR). Keeping the switch out of SysTick is the standard Cortex-M idiom.
+// bit so the actual switch happens in PendSV (lowest priority, after any other
+// ISR). Keeping the switch out of SysTick is the standard Cortex-M idiom.
 void SysTick_Handler(void) {
     SCB->ICSR = SCB_ICSR_PENDSVSET_Msk;
 }
@@ -145,34 +147,16 @@ int main(void) {
     for (int i = 0; i < NUM_TASKS; i++)
         task_init_stack(i, task_entries[i]);
 
-    // Make PendSV the lowest priority so it never preempts a real ISR; it runs
-    // only once everything else has finished (that is why we switch there).
-    SCB->SHP[1] = 0xFFu;              // PendSV priority = lowest (SHPR3, byte 2)
+    // PendSV at lowest priority: it must never preempt a real ISR; it runs only
+    // once everything else has finished (that is precisely why we switch there).
+    SCB->SHP[1] = 0xFFu;             // SHPR3 byte 2 = PendSV priority = lowest
 
     // Start SysTick: MSI is 4 MHz after reset, so 40000 counts = 10 ms tick.
+    // current stays -1; the first PendSV will launch task 0.
     SysTick_Config(40000);
 
-    // Launch the first task by hand: point PSP at task 0's frame, switch the
-    // CPU to use PSP in Thread mode, then "return" into the task by popping its
-    // frame -- reusing the same restore path PendSV uses.
-    current = 0;
-    __set_PSP((uint32_t)tasks[0].sp + 8 * 4); // PSP above the R4-R11 area...
-    __asm volatile(
-        "  ldr r0, =tasks           \n"
-        "  ldr r0, [r0]             \n" // r0 = tasks[0].sp
-        "  ldmia r0!, {r4-r11}      \n" // restore R4-R11
-        "  msr psp, r0              \n"
-        "  movs r0, #2              \n"
-        "  msr control, r0          \n" // CONTROL.SPSEL=1: Thread mode uses PSP
-        "  isb                      \n"
-        "  ldr lr, =0xFFFFFFFD      \n" // EXC_RETURN not valid outside handler..
-        "  ldr r0, =0               \n"
-        ::: "r0", "memory");
-
-    // The line above cannot cleanly "return into" a task from Thread mode (that
-    // trick only works from an exception). Instead we just enable interrupts and
-    // fall into a spin; the FIRST SysTick -> PendSV will do the real launch,
-    // switching from this main context to a task. main's own frame becomes an
-    // implicit "task -1" that is simply never scheduled again.
+    // main() keeps running on the MSP until the first tick fires PendSV, which
+    // switches the CPU onto task 0's PSP. From then on this loop is dead code --
+    // main()'s context is never scheduled again.
     while (1);
 }
