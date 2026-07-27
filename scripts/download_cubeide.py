@@ -22,7 +22,8 @@ import sys
 # that interpreter. Lets this single script "just work" without a wrapper.
 def _reexec_in_venv():
     try:
-        import playwright  # noqa: F401
+        # deliberate probe: the import is the test, hence unused and local.
+        import playwright  # noqa: F401  # pylint: disable=import-outside-toplevel,unused-import
         return  # already good
     except ImportError:
         pass
@@ -36,6 +37,18 @@ def _reexec_in_venv():
 
 _reexec_in_venv()
 
+# The imports below must follow _reexec_in_venv(): the re-exec has to happen
+# before anything that may pull in playwright-dependent machinery, so they
+# cannot be hoisted to the top of the file.
+# ruff: noqa: E402
+#
+# This script drives a third-party site whose markup changes without notice,
+# so every step is best-effort: broad `except Exception` around each probe is
+# deliberate (a failed step must fall through to the next strategy, never
+# abort the run). The main() flow is correspondingly long and linear, and the
+# playwright imports are deferred so the script can re-exec first.
+# pylint: disable=broad-exception-caught,wrong-import-position
+# pylint: disable=too-many-statements,import-outside-toplevel,unused-import
 import argparse
 import re
 import subprocess
@@ -66,7 +79,7 @@ def check_reachable(url=REACH_URL, timeout=10, attempts=4):
     failed probe is not conclusive. Any HTTP response - including 3xx/4xx -
     counts as reachable. Returns (ok, detail)."""
     last = ""
-    for i in range(attempts):
+    for _ in range(attempts):
         req = urllib.request.Request(url, method="GET",
                                      headers={"User-Agent": BROWSER_UA})
         try:
@@ -86,6 +99,9 @@ def check_reachable(url=REACH_URL, timeout=10, attempts=4):
             ["curl", "-sSL", "-o", "/dev/null", "-w", "%{http_code}",
              "-A", BROWSER_UA, "--max-time", str(timeout), url],
             capture_output=True, text=True, timeout=timeout + 5,
+            # the return code is inspected below; a non-zero curl exit is a
+            # normal outcome here, not an error to raise on.
+            check=False,
         )
         code = (out.stdout or "").strip()
         if code and code != "000":
@@ -391,7 +407,8 @@ def main() -> int:
                   f"       ({type(e).__name__}: {str(e).splitlines()[0]})\n"
                   "       check your network / that st.com is reachable.",
                   file=sys.stderr)
-            ctx.close(); browser.close()
+            ctx.close()
+            browser.close()
             return 3
         click_if_present(page, [
             "button:has-text('Accept')",

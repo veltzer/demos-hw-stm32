@@ -1,0 +1,32 @@
+# Repo-specific overlay. Deep-merged over the canonical rsconstruct.toml.
+#
+# The C/C++ sources under examples/ and exercises/ are STM32 target code
+# (they include vendor headers like stm32wl55xx.h and some are bare snippets),
+# so they are not host-compilable and are only term/markdown checked here.
+# The workspace/ tree is generated STM32CubeIDE/CMake output and is excluded.
+# The STM32CubeWL/ tree is the externally-cloned vendor HAL package (gitignored)
+# and is likewise excluded from linting.
+
+[vars]
+generated_excludes = [
+	"/workspace/",
+	"/STM32CubeWL/",
+]
+
+# Markdown lives at the repo root (README, per-exercise exercise.md files)
+# rather than in the canonical src/docs/... set, and the generated/vendor
+# trees must be excluded.
+[processor.rumdl]
+src_dirs = ["."]
+src_exclude_dirs = "${generated_excludes}"
+
+# Canonical scans "." for TOML too, but the vendor/generated trees carry
+# their own TOML that must not be linted.
+[processor.taplo]
+src_exclude_dirs = "${generated_excludes}"
+
+# Only the helper shell scripts are ours; canonical's wider src_dirs would
+# reach into the vendor tree.
+[processor.shellcheck]
+src_dirs = ["scripts"]
+src_extensions = [".sh"]
