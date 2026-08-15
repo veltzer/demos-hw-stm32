@@ -30,3 +30,11 @@ src_exclude_dirs = "${generated_excludes}"
 [processor.shellcheck]
 src_dirs = ["scripts"]
 src_extensions = [".sh"]
+
+# Install the pinned demo libraries so pylint/mypy can resolve the imports in
+# the exercises; without this CI has none of them and every import fails.
+[dependencies]
+pip = [
+	"-r",
+	"requirements.txt",
+]
