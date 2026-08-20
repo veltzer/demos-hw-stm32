@@ -49,12 +49,12 @@ _reexec_in_venv()
 # playwright imports are deferred so the script can re-exec first.
 # pylint: disable=broad-exception-caught,wrong-import-position
 # pylint: disable=too-many-statements,import-outside-toplevel,unused-import
-import argparse  # noqa: E402
-import re  # noqa: E402
-import subprocess  # noqa: E402
-import urllib.error  # noqa: E402
-import urllib.request  # noqa: E402
-from pathlib import Path  # noqa: E402
+import argparse
+import re
+import subprocess
+import urllib.error
+import urllib.request
+from pathlib import Path
 
 CUBEIDE_URL = "https://www.st.com/en/development-tools/stm32cubeide.html"
 LOGIN_HINT = "https://www.st.com/content/st_com/en/user/login.html"
