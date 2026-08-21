@@ -11,6 +11,12 @@
 /exercises/common/.hal_obj_cm0/
 /exercises/common/libhal_cm4.a
 /exercises/common/libhal_cm0.a
+# same HAL libraries as built by rsconstruct (separate intermediates so the
+# two build systems never share object files; see rsconstruct.local.toml)
+/exercises/common/.rsc_hal_obj_cm4/
+/exercises/common/.rsc_hal_obj_cm0/
+/exercises/common/libhal_rsc_cm4.a
+/exercises/common/libhal_rsc_cm0.a
 # STM32CubeWL firmware package (HAL/LL/CMSIS), cloned by scripts/clone_cubewl.sh
 # into the repo root. External vendor source, never committed.
 /STM32CubeWL/

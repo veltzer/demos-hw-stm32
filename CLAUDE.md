@@ -101,6 +101,37 @@ Commands:
     make -j              # parallel
     make V=1 ...         # verbose (echo commands)
 
+### rsconstruct mirror of the Makefile
+
+`rsconstruct build` also builds ALL the firmware (plus the host examples), to
+the **same in-tree paths** as make, so the flash scripts work with either
+build system. The wiring lives at the bottom of `rsconstruct.local.toml`:
+
+- `[processor.explicit.hal_lib_cm4/cm0]` build the shared HAL driver
+  libraries via `scripts/rsc_build_hal_lib.sh` into
+  `exercises/common/libhal_rsc_<core>.a` (separate names/objects from make's
+  `libhal_<core>.a` so the two systems never share intermediates). Their
+  declared outputs give the HAL image products dependency edges, so ordering
+  is correct even on a cold build.
+- Six `[processor.explicit.fw_*]` products mirror the Makefile's six IMAGE
+  classes (single bare/hal, dual cm4/cm0p x bare/hal) via
+  `scripts/rsc_build_image.sh`. Inputs are glob-discovered `main*.c` like
+  make's discovery; `output_files` are enumerated, so a NEW exercise builds
+  automatically but must be added to the stanza's `output_files` list to be
+  cached/cleaned.
+- `[processor.cc_single_file]` builds `examples/*.cc` to `examples/*.elf`.
+
+Rebuild granularity is per image class (not per object); each image is one
+compile+link of three small TUs. HAL images are functionally identical to
+make's but not byte-identical: make's `$(wildcard)` archives HAL objects in
+readdir order while the script uses sorted order, so the linker lays the
+library out differently (same sizes, same symbols). The gitignored
+`STM32CubeWL/` clone cannot be tracked as an input (rsconstruct's file index
+honors .gitignore); `scripts/clone_cubewl.sh` is the proxy rebuild trigger
+for vendor-tree changes. Note this makes `arm-none-eabi-gcc` and the CubeWL
+clone prerequisites of `rsconstruct build` (and therefore of any CI that
+runs it).
+
 ## Flashing
 
 Build first with `make` (above); the flash scripts only flash, never build.
