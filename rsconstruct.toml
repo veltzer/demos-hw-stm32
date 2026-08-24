@@ -1,14 +1,5 @@
-# Canonical shared rsconstruct.toml — this file is IDENTICAL in every repo.
-#
-# Do not edit per-repo copies. Edit the canonical copy
-# (/home/mark/git/rsconstruct.canonical.toml) and sync it out.
-# Repo-specific configuration (dependencies, explicit generators, excludes,
-# one-off workarounds) lives in rsconstruct.local.toml, which rsconstruct
-# deep-merges over this file at load time.
-#
-# skip_missing_src_dirs makes this file a menu: a processor whose directories
-# don't exist in a given repo simply matches no files there. The directory
-# layout of each repo decides which checks run.
+# rsconstruct configuration for this repository — shared defaults plus
+# repo-specific config (merged from the former rsconstruct.local.toml).
 
 [build]
 
@@ -20,100 +11,343 @@
 
 [analyzer.python]
 
-# ─── templating ──────────────────────────────────────────────────────────────
-
-# Convention: tera configs are Lua (config/*.lua). dep_auto entries are
-# silently skipped where absent. Repos still on config/*.py keep a
-# dep_inputs override in their local overlay until converted.
-[processor.tera]
-src_dirs = ["tera.templates"]
-dep_auto = [
-	"config/project.lua",
-	"config/personal.lua",
-	"config/version.lua",
-	"config/github.lua",
-	"config/python.lua",
-	"config/shared.lua",
-]
-
 # ─── markdown ────────────────────────────────────────────────────────────────
 
 [processor.rumdl]
-src_dirs = ["src", "docs", "exercises", "notes", "marp"]
+src_dirs = ["."]
+src_exclude_dirs = "${generated_excludes}"
 
 [processor.zspell]
-src_dirs = ["src", "docs", "exercises", "notes", "marp", "syllabi", "out/generator"]
+src_dirs = ["exercises"]
 
 # ─── python ──────────────────────────────────────────────────────────────────
 
 [processor.ruff]
-src_dirs = ["src", "scripts", "config", "tests", "exercises", "animations"]
+src_dirs = ["scripts", "exercises"]
 
 [processor.pylint]
-src_dirs = ["src", "scripts", "config", "tests", "exercises", "animations"]
+src_dirs = ["scripts", "exercises"]
 
 [processor.mypy]
-src_dirs = ["src", "scripts", "config", "tests", "exercises", "animations"]
+src_dirs = ["scripts", "exercises"]
 
 [processor.requirements]
-src_dirs = ["src", "scripts", "config", "tests", "animations"]
-
-[processor.pytest]
-src_dirs = ["tests"]
+src_dirs = ["scripts"]
 
 # ─── shell ───────────────────────────────────────────────────────────────────
 
 [processor.shellcheck]
-src_dirs = ["scripts", "src", "misc", "exercises", "docs", "config"]
+src_dirs = ["scripts"]
 args = ["--severity=error", "--shell=bash"]
-
-# ─── lua ─────────────────────────────────────────────────────────────────────
-
-[processor.luacheck]
-src_dirs = ["config", "print"]
+src_extensions = [".sh"]
 
 # ─── toml / yaml / json ──────────────────────────────────────────────────────
 
 [processor.taplo]
 src_dirs = ["."]
+src_exclude_dirs = "${generated_excludes}"
 
-[processor.iyamllint]
-src_dirs = ["yaml", "tracks"]
+# ─── merged from rsconstruct.local.toml ─────────────────────────────────────
 
-[processor.ijsonlint]
-src_dirs = ["json"]
+[vars]
+generated_excludes = [
+	"/workspace/",
+	"/STM32CubeWL/",
+]
 
-# ─── web ─────────────────────────────────────────────────────────────────────
+# Install the pinned demo libraries so pylint/mypy can resolve the imports in
+# the exercises; without this CI has none of them and every import fails.
+[dependencies]
+pip = [
+	"-r",
+	"requirements.txt",
+]
 
-[processor.stylelint]
-src_dirs = ["resources", "site-resources", "print"]
+# ─── firmware build (rsconstruct mirror of the root Makefile) ────────────────
+#
+# These stanzas make `rsconstruct build` produce the same artifacts as `make`,
+# at the same in-tree paths (app_<tag>.elf / app_<tag>.map /
+# firmware_<tag>.bin beside each main*.c), so scripts/flash_exercise.sh works
+# unchanged. Layout mirrors the Makefile's structure:
+#
+#   - two explicit products build the shared HAL driver libraries (one per
+#     core) via scripts/rsc_build_hal_lib.sh; their declared output .a files
+#     give the HAL image products real dependency edges, so ordering is
+#     correct even on a cold build (fixed-point discovery injects the libs
+#     as virtual files before they exist);
+#   - six explicit products build the six image classes of the Makefile's
+#     IMAGE template (single bare/hal, dual cm4/cm0p x bare/hal) via
+#     scripts/rsc_build_image.sh; the main*.c inputs are glob-discovered
+#     like the Makefile's discovery, but output_files are enumerated (a NEW
+#     exercise builds automatically via the glob, yet its artifacts must be
+#     added here to be cached/cleaned);
+#   - cc_single_file builds the standalone host examples/*.cc to
+#     examples/*.elf, like the Makefile's examples target.
+#
+# Rebuild granularity is per image class (a changed main_bare.c relinks all
+# bare single-core images -- each is one small compile+link), not per object
+# like make. The STM32CubeWL clone is gitignored, so its HAL sources and
+# CMSIS headers cannot be tracked as inputs; scripts/clone_cubewl.sh stands
+# in as the proxy trigger for vendor-tree changes.
 
-[processor.htmlhint]
-src_dirs = ["src", "site-resources"]
+[processor.cc_single_file]
+src_dirs = ["examples"]
+src_extensions = [".cc"]
+output_dir = "."
+cxxflags = ["-Wall", "-O2"]
 
-[processor.tidy]
-src_dirs = ["src", "blog"]
+[processor.explicit.hal_lib_cm4]
+command = "scripts/rsc_build_hal_lib.sh"
+args = ["cm4"]
+required_tools = ["arm-none-eabi-gcc", "arm-none-eabi-ar"]
+inputs = [
+	"scripts/rsc_build_hal_lib.sh",
+	"scripts/clone_cubewl.sh",
+	"exercises/common/stm32wlxx_hal_conf.h",
+]
+output_files = ["exercises/common/libhal_rsc_cm4.a"]
 
-[processor.eslint]
-src_dirs = ["site-resources", "shared", "config", "blog"]
-args = ["-c", "config/eslint.config.js"]
+[processor.explicit.hal_lib_cm0]
+command = "scripts/rsc_build_hal_lib.sh"
+args = ["cm0"]
+required_tools = ["arm-none-eabi-gcc", "arm-none-eabi-ar"]
+inputs = [
+	"scripts/rsc_build_hal_lib.sh",
+	"scripts/clone_cubewl.sh",
+	"exercises/common/stm32wlxx_hal_conf.h",
+]
+output_files = ["exercises/common/libhal_rsc_cm0.a"]
 
-# ─── teaching content ────────────────────────────────────────────────────────
+[processor.explicit.fw_single_bare]
+command = "scripts/rsc_build_image.sh"
+required_tools = ["arm-none-eabi-gcc", "arm-none-eabi-objcopy"]
+inputs = [
+	"scripts/rsc_build_image.sh",
+	"exercises/common/system_stm32wlxx.c",
+	"exercises/common/startup_stm32wl55jcix.s",
+	"exercises/common/STM32WL55JCIX_FLASH_M4.ld",
+]
+input_globs = [
+	"exercises/single_core/*/main_bare.c",
+	"exercises/single_core/*/STM32WL55JCIX_FLASH_M4.ld",
+]
+output_files = [
+	"exercises/single_core/00_simple_led/app_bare.elf",
+	"exercises/single_core/00_simple_led/app_bare.map",
+	"exercises/single_core/00_simple_led/firmware_bare.bin",
+	"exercises/single_core/01_led_patterns/app_bare.elf",
+	"exercises/single_core/01_led_patterns/app_bare.map",
+	"exercises/single_core/01_led_patterns/firmware_bare.bin",
+	"exercises/single_core/02_buttons_test/app_bare.elf",
+	"exercises/single_core/02_buttons_test/app_bare.map",
+	"exercises/single_core/02_buttons_test/firmware_bare.bin",
+	"exercises/single_core/03_serial_counter/app_bare.elf",
+	"exercises/single_core/03_serial_counter/app_bare.map",
+	"exercises/single_core/03_serial_counter/firmware_bare.bin",
+	"exercises/single_core/04_buttons_and_leds/app_bare.elf",
+	"exercises/single_core/04_buttons_and_leds/app_bare.map",
+	"exercises/single_core/04_buttons_and_leds/firmware_bare.bin",
+	"exercises/single_core/05_interrupts/app_bare.elf",
+	"exercises/single_core/05_interrupts/app_bare.map",
+	"exercises/single_core/05_interrupts/firmware_bare.bin",
+	"exercises/single_core/06_timing_leds/app_bare.elf",
+	"exercises/single_core/06_timing_leds/app_bare.map",
+	"exercises/single_core/06_timing_leds/firmware_bare.bin",
+	"exercises/single_core/07_cooperative_scheduling/app_bare.elf",
+	"exercises/single_core/07_cooperative_scheduling/app_bare.map",
+	"exercises/single_core/07_cooperative_scheduling/firmware_bare.bin",
+	"exercises/single_core/08_preemption/app_bare.elf",
+	"exercises/single_core/08_preemption/app_bare.map",
+	"exercises/single_core/08_preemption/firmware_bare.bin",
+	"exercises/single_core/09_os_coop_single_stack/app_bare.elf",
+	"exercises/single_core/09_os_coop_single_stack/app_bare.map",
+	"exercises/single_core/09_os_coop_single_stack/firmware_bare.bin",
+	"exercises/single_core/10_os_coop_two_stacks/app_bare.elf",
+	"exercises/single_core/10_os_coop_two_stacks/app_bare.map",
+	"exercises/single_core/10_os_coop_two_stacks/firmware_bare.bin",
+	"exercises/single_core/11_os_preempt_two_stacks/app_bare.elf",
+	"exercises/single_core/11_os_preempt_two_stacks/app_bare.map",
+	"exercises/single_core/11_os_preempt_two_stacks/firmware_bare.bin",
+]
 
-[processor.tags]
-src_dirs = ["syllabi", "out/generator"]
-required_fields = ["tags", "level", "category", "audience"]
-required_field_groups = [["duration_hours"], ["duration_hours_long", "duration_hours_short"]]
+[processor.explicit.fw_single_hal]
+command = "scripts/rsc_build_image.sh"
+required_tools = ["arm-none-eabi-gcc", "arm-none-eabi-objcopy"]
+inputs = [
+	"scripts/rsc_build_image.sh",
+	"exercises/common/system_stm32wlxx.c",
+	"exercises/common/startup_stm32wl55jcix.s",
+	"exercises/common/STM32WL55JCIX_FLASH_M4.ld",
+	"exercises/common/stm32wlxx_hal_conf.h",
+	"exercises/common/libhal_rsc_cm4.a",
+]
+input_globs = [
+	"exercises/single_core/*/main_hal.c",
+	"exercises/single_core/*/STM32WL55JCIX_FLASH_M4.ld",
+]
+output_files = [
+	"exercises/single_core/00_simple_led/app_hal.elf",
+	"exercises/single_core/00_simple_led/app_hal.map",
+	"exercises/single_core/00_simple_led/firmware_hal.bin",
+	"exercises/single_core/01_led_patterns/app_hal.elf",
+	"exercises/single_core/01_led_patterns/app_hal.map",
+	"exercises/single_core/01_led_patterns/firmware_hal.bin",
+	"exercises/single_core/02_buttons_test/app_hal.elf",
+	"exercises/single_core/02_buttons_test/app_hal.map",
+	"exercises/single_core/02_buttons_test/firmware_hal.bin",
+	"exercises/single_core/03_serial_counter/app_hal.elf",
+	"exercises/single_core/03_serial_counter/app_hal.map",
+	"exercises/single_core/03_serial_counter/firmware_hal.bin",
+	"exercises/single_core/04_buttons_and_leds/app_hal.elf",
+	"exercises/single_core/04_buttons_and_leds/app_hal.map",
+	"exercises/single_core/04_buttons_and_leds/firmware_hal.bin",
+	"exercises/single_core/05_interrupts/app_hal.elf",
+	"exercises/single_core/05_interrupts/app_hal.map",
+	"exercises/single_core/05_interrupts/firmware_hal.bin",
+	"exercises/single_core/06_timing_leds/app_hal.elf",
+	"exercises/single_core/06_timing_leds/app_hal.map",
+	"exercises/single_core/06_timing_leds/firmware_hal.bin",
+	"exercises/single_core/07_cooperative_scheduling/app_hal.elf",
+	"exercises/single_core/07_cooperative_scheduling/app_hal.map",
+	"exercises/single_core/07_cooperative_scheduling/firmware_hal.bin",
+	"exercises/single_core/08_preemption/app_hal.elf",
+	"exercises/single_core/08_preemption/app_hal.map",
+	"exercises/single_core/08_preemption/firmware_hal.bin",
+	"exercises/single_core/09_os_coop_single_stack/app_hal.elf",
+	"exercises/single_core/09_os_coop_single_stack/app_hal.map",
+	"exercises/single_core/09_os_coop_single_stack/firmware_hal.bin",
+	"exercises/single_core/10_os_coop_two_stacks/app_hal.elf",
+	"exercises/single_core/10_os_coop_two_stacks/app_hal.map",
+	"exercises/single_core/10_os_coop_two_stacks/firmware_hal.bin",
+	"exercises/single_core/11_os_preempt_two_stacks/app_hal.elf",
+	"exercises/single_core/11_os_preempt_two_stacks/app_hal.map",
+	"exercises/single_core/11_os_preempt_two_stacks/firmware_hal.bin",
+]
 
-[processor.terms]
-src_dirs = ["syllabi", "out/generator"]
+[processor.explicit.fw_dual_cm4_bare]
+command = "scripts/rsc_build_image.sh"
+required_tools = ["arm-none-eabi-gcc", "arm-none-eabi-objcopy"]
+inputs = [
+	"scripts/rsc_build_image.sh",
+	"exercises/common/system_stm32wlxx.c",
+	"exercises/common/startup_stm32wl55jcix.s",
+	"exercises/common/STM32WL55JCIX_FLASH_M4.ld",
+]
+input_globs = [
+	"exercises/dual_core/*/main_cm4_bare.c",
+	"exercises/dual_core/*/STM32WL55JCIX_FLASH_M4.ld",
+]
+output_files = [
+	"exercises/dual_core/00_dual_blink/app_cm4_bare.elf",
+	"exercises/dual_core/00_dual_blink/app_cm4_bare.map",
+	"exercises/dual_core/00_dual_blink/firmware_cm4_bare.bin",
+	"exercises/dual_core/01_multi_core_mailboxes/app_cm4_bare.elf",
+	"exercises/dual_core/01_multi_core_mailboxes/app_cm4_bare.map",
+	"exercises/dual_core/01_multi_core_mailboxes/firmware_cm4_bare.bin",
+	"exercises/dual_core/02_semaphores/app_cm4_bare.elf",
+	"exercises/dual_core/02_semaphores/app_cm4_bare.map",
+	"exercises/dual_core/02_semaphores/firmware_cm4_bare.bin",
+	"exercises/dual_core/03_basic_shared_memory/app_cm4_bare.elf",
+	"exercises/dual_core/03_basic_shared_memory/app_cm4_bare.map",
+	"exercises/dual_core/03_basic_shared_memory/firmware_cm4_bare.bin",
+	"exercises/dual_core/04_atomic_increment/app_cm4_bare.elf",
+	"exercises/dual_core/04_atomic_increment/app_cm4_bare.map",
+	"exercises/dual_core/04_atomic_increment/firmware_cm4_bare.bin",
+]
 
-[processor.pandoc.syllabi]
-src_dirs = ["syllabi"]
-formats = ["pdf", "html", "docx"]
+[processor.explicit.fw_dual_cm0p_bare]
+command = "scripts/rsc_build_image.sh"
+required_tools = ["arm-none-eabi-gcc", "arm-none-eabi-objcopy"]
+inputs = [
+	"scripts/rsc_build_image.sh",
+	"exercises/common/system_stm32wlxx.c",
+	"exercises/common/startup_stm32wl55jcix_cm0plus.s",
+	"exercises/common/STM32WL55JCIX_FLASH_CM0PLUS.ld",
+]
+input_globs = [
+	"exercises/dual_core/*/main_cm0p_bare.c",
+	"exercises/dual_core/*/STM32WL55JCIX_FLASH_CM0PLUS.ld",
+]
+output_files = [
+	"exercises/dual_core/00_dual_blink/app_cm0p_bare.elf",
+	"exercises/dual_core/00_dual_blink/app_cm0p_bare.map",
+	"exercises/dual_core/00_dual_blink/firmware_cm0p_bare.bin",
+	"exercises/dual_core/01_multi_core_mailboxes/app_cm0p_bare.elf",
+	"exercises/dual_core/01_multi_core_mailboxes/app_cm0p_bare.map",
+	"exercises/dual_core/01_multi_core_mailboxes/firmware_cm0p_bare.bin",
+	"exercises/dual_core/02_semaphores/app_cm0p_bare.elf",
+	"exercises/dual_core/02_semaphores/app_cm0p_bare.map",
+	"exercises/dual_core/02_semaphores/firmware_cm0p_bare.bin",
+	"exercises/dual_core/03_basic_shared_memory/app_cm0p_bare.elf",
+	"exercises/dual_core/03_basic_shared_memory/app_cm0p_bare.map",
+	"exercises/dual_core/03_basic_shared_memory/firmware_cm0p_bare.bin",
+	"exercises/dual_core/04_atomic_increment/app_cm0p_bare.elf",
+	"exercises/dual_core/04_atomic_increment/app_cm0p_bare.map",
+	"exercises/dual_core/04_atomic_increment/firmware_cm0p_bare.bin",
+]
 
-[processor.script.check_md]
-command = "scripts/check_md.py"
-src_extensions = [".md"]
-src_dirs = ["syllabi", "marp", "out/generator"]
-batch = true
+[processor.explicit.fw_dual_cm4_hal]
+command = "scripts/rsc_build_image.sh"
+required_tools = ["arm-none-eabi-gcc", "arm-none-eabi-objcopy"]
+inputs = [
+	"scripts/rsc_build_image.sh",
+	"exercises/common/system_stm32wlxx.c",
+	"exercises/common/startup_stm32wl55jcix.s",
+	"exercises/common/STM32WL55JCIX_FLASH_M4.ld",
+	"exercises/common/stm32wlxx_hal_conf.h",
+	"exercises/common/libhal_rsc_cm4.a",
+]
+input_globs = [
+	"exercises/dual_core/*/main_cm4_hal.c",
+	"exercises/dual_core/*/STM32WL55JCIX_FLASH_M4.ld",
+]
+output_files = [
+	"exercises/dual_core/00_dual_blink/app_cm4_hal.elf",
+	"exercises/dual_core/00_dual_blink/app_cm4_hal.map",
+	"exercises/dual_core/00_dual_blink/firmware_cm4_hal.bin",
+	"exercises/dual_core/01_multi_core_mailboxes/app_cm4_hal.elf",
+	"exercises/dual_core/01_multi_core_mailboxes/app_cm4_hal.map",
+	"exercises/dual_core/01_multi_core_mailboxes/firmware_cm4_hal.bin",
+	"exercises/dual_core/02_semaphores/app_cm4_hal.elf",
+	"exercises/dual_core/02_semaphores/app_cm4_hal.map",
+	"exercises/dual_core/02_semaphores/firmware_cm4_hal.bin",
+	"exercises/dual_core/03_basic_shared_memory/app_cm4_hal.elf",
+	"exercises/dual_core/03_basic_shared_memory/app_cm4_hal.map",
+	"exercises/dual_core/03_basic_shared_memory/firmware_cm4_hal.bin",
+	"exercises/dual_core/04_atomic_increment/app_cm4_hal.elf",
+	"exercises/dual_core/04_atomic_increment/app_cm4_hal.map",
+	"exercises/dual_core/04_atomic_increment/firmware_cm4_hal.bin",
+]
+
+[processor.explicit.fw_dual_cm0p_hal]
+command = "scripts/rsc_build_image.sh"
+required_tools = ["arm-none-eabi-gcc", "arm-none-eabi-objcopy"]
+inputs = [
+	"scripts/rsc_build_image.sh",
+	"exercises/common/system_stm32wlxx.c",
+	"exercises/common/startup_stm32wl55jcix_cm0plus.s",
+	"exercises/common/STM32WL55JCIX_FLASH_CM0PLUS.ld",
+	"exercises/common/stm32wlxx_hal_conf.h",
+	"exercises/common/libhal_rsc_cm0.a",
+]
+input_globs = [
+	"exercises/dual_core/*/main_cm0p_hal.c",
+	"exercises/dual_core/*/STM32WL55JCIX_FLASH_CM0PLUS.ld",
+]
+output_files = [
+	"exercises/dual_core/00_dual_blink/app_cm0p_hal.elf",
+	"exercises/dual_core/00_dual_blink/app_cm0p_hal.map",
+	"exercises/dual_core/00_dual_blink/firmware_cm0p_hal.bin",
+	"exercises/dual_core/01_multi_core_mailboxes/app_cm0p_hal.elf",
+	"exercises/dual_core/01_multi_core_mailboxes/app_cm0p_hal.map",
+	"exercises/dual_core/01_multi_core_mailboxes/firmware_cm0p_hal.bin",
+	"exercises/dual_core/02_semaphores/app_cm0p_hal.elf",
+	"exercises/dual_core/02_semaphores/app_cm0p_hal.map",
+	"exercises/dual_core/02_semaphores/firmware_cm0p_hal.bin",
+	"exercises/dual_core/03_basic_shared_memory/app_cm0p_hal.elf",
+	"exercises/dual_core/03_basic_shared_memory/app_cm0p_hal.map",
+	"exercises/dual_core/03_basic_shared_memory/firmware_cm0p_hal.bin",
+	"exercises/dual_core/04_atomic_increment/app_cm0p_hal.elf",
+	"exercises/dual_core/04_atomic_increment/app_cm0p_hal.map",
+	"exercises/dual_core/04_atomic_increment/firmware_cm0p_hal.bin",
+]
