@@ -16,6 +16,9 @@
 # Flags mirror the Makefile. Each image is one compile+link invocation of its
 # three small translation units, so no intermediate objects are kept.
 
+# Remember whether the caller chose the location: an explicit CUBEWL is a
+# tree they manage, so it is never auto-fetched (see the guard below).
+CUBEWL_EXPLICIT="${CUBEWL:+1}"
 CUBEWL="${CUBEWL:-STM32CubeWL}"
 COMMON="exercises/common"
 CMSIS_INC="$CUBEWL/Drivers/CMSIS"
@@ -23,10 +26,19 @@ HAL_DRV="$CUBEWL/Drivers/STM32WLxx_HAL_Driver"
 CC=arm-none-eabi-gcc
 OBJCOPY=arm-none-eabi-objcopy
 
+# Fetch the vendor tree if it is not there. It is gitignored (186M of
+# STMicroelectronics source), so a fresh checkout -- a CI runner in
+# particular -- has nothing until this runs. clone_cubewl.sh is idempotent
+# and takes an flock, so the parallel image builds cannot race here. Only
+# the default location is auto-fetched: an explicit CUBEWL points at a tree
+# the caller manages, so a missing one stays an error.
 if [ ! -f "$HAL_DRV/Src/stm32wlxx_hal_ipcc.c" ]; then
-	echo "STM32CubeWL not found at '$CUBEWL'. No exercises can build." >&2
-	echo "Run: scripts/clone_cubewl.sh   (or set CUBEWL=/path/to/STM32CubeWL)" >&2
-	exit 1
+	if [ -n "${CUBEWL_EXPLICIT:-}" ]; then
+		echo "STM32CubeWL not found at '$CUBEWL'. No exercises can build." >&2
+		echo "Set CUBEWL to a valid STM32CubeWL tree, or unset it to auto-fetch." >&2
+		exit 1
+	fi
+	"$(dirname "$0")/clone_cubewl.sh" >&2
 fi
 
 # Benign linker noise to hide (newlib-nano unimplemented-syscall warnings and

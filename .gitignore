@@ -224,6 +224,8 @@ claude/
 
 # stm32 demos
 /STM32CubeWL/
+# flock file guarding the concurrent clone of the tree above
+/.cubewl.lock
 /exercises/*/*/.obj/
 /exercises/*/*/app*.elf
 /exercises/*/*/app*.map

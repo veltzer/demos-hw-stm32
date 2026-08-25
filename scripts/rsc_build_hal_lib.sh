@@ -19,6 +19,9 @@ if [ "$core" != cm4 ] && [ "$core" != cm0 ]; then
 fi
 shift
 
+# Remember whether the caller chose the location: an explicit CUBEWL is a
+# tree they manage, so it is never auto-fetched (see the guard below).
+CUBEWL_EXPLICIT="${CUBEWL:+1}"
 CUBEWL="${CUBEWL:-STM32CubeWL}"
 COMMON="exercises/common"
 CMSIS_INC="$CUBEWL/Drivers/CMSIS"
@@ -26,10 +29,16 @@ HAL_DRV="$CUBEWL/Drivers/STM32WLxx_HAL_Driver"
 CC=arm-none-eabi-gcc
 AR=arm-none-eabi-ar
 
+# Fetch the vendor tree if it is not there -- see the same block in
+# rsc_build_image.sh. clone_cubewl.sh is idempotent and flock-guarded, so
+# the cm4 and cm0 libraries building in parallel cannot race.
 if [ ! -f "$HAL_DRV/Src/stm32wlxx_hal_ipcc.c" ]; then
-	echo "STM32CubeWL not found at '$CUBEWL'. The HAL library cannot build." >&2
-	echo "Run: scripts/clone_cubewl.sh   (or set CUBEWL=/path/to/STM32CubeWL)" >&2
-	exit 1
+	if [ -n "${CUBEWL_EXPLICIT:-}" ]; then
+		echo "STM32CubeWL not found at '$CUBEWL'. The HAL library cannot build." >&2
+		echo "Set CUBEWL to a valid STM32CubeWL tree, or unset it to auto-fetch." >&2
+		exit 1
+	fi
+	"$(dirname "$0")/clone_cubewl.sh" >&2
 fi
 
 # The library path is the first --output-files entry.
