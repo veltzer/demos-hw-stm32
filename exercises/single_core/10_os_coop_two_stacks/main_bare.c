@@ -49,7 +49,7 @@ static int     current;           // index of the task currently running
 // entry. The entry loops forever and never returns, so we never need to
 // restore the scheduler's SP here -- control leaves only via yield()'s longjmp.
 static void __attribute__((noreturn))
-start_on_stack(void (*entry)(void), uint32_t *stack_top) {
+start_on_stack(void (*entry)(void), const uint32_t *stack_top) {
     __asm volatile(
         "mov sp, %0\n"
         "blx %1\n"
@@ -112,7 +112,7 @@ static void scheduler(void) {
             tasks[current].started = 1;
             // First run: enter the task on its OWN stack (top of the array,
             // full-descending). It loops forever + yields, never returns.
-            uint32_t *top = &tasks[current].stack[256];
+            const uint32_t *top = &tasks[current].stack[256];
             start_on_stack(task_entries[current], top);
         } else {
             longjmp(tasks[current].context, 1); // resume where it yielded

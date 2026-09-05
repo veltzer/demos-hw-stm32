@@ -21,8 +21,8 @@
 CUBEWL_EXPLICIT="${CUBEWL:+1}"
 CUBEWL="${CUBEWL:-STM32CubeWL}"
 COMMON="exercises/common"
-CMSIS_INC="$CUBEWL/Drivers/CMSIS"
-HAL_DRV="$CUBEWL/Drivers/STM32WLxx_HAL_Driver"
+CMSIS_INC="${CUBEWL}/Drivers/CMSIS"
+HAL_DRV="${CUBEWL}/Drivers/STM32WLxx_HAL_Driver"
 CC=arm-none-eabi-gcc
 OBJCOPY=arm-none-eabi-objcopy
 
@@ -32,9 +32,9 @@ OBJCOPY=arm-none-eabi-objcopy
 # and takes an flock, so the parallel image builds cannot race here. Only
 # the default location is auto-fetched: an explicit CUBEWL points at a tree
 # the caller manages, so a missing one stays an error.
-if [ ! -f "$HAL_DRV/Src/stm32wlxx_hal_ipcc.c" ]; then
+if [ ! -f "${HAL_DRV}/Src/stm32wlxx_hal_ipcc.c" ]; then
 	if [ -n "${CUBEWL_EXPLICIT:-}" ]; then
-		echo "STM32CubeWL not found at '$CUBEWL'. No exercises can build." >&2
+		echo "STM32CubeWL not found at '${CUBEWL}'. No exercises can build." >&2
 		echo "Set CUBEWL to a valid STM32CubeWL tree, or unset it to auto-fetch." >&2
 		exit 1
 	fi
@@ -50,13 +50,13 @@ LD_NOISE='is not implemented and will always fail|does not take linker garbage c
 mains=()
 section=""
 for arg in "$@"; do
-	case "$arg" in
+	case "${arg}" in
 	--inputs) section=inputs ;;
 	--output-files | --output-dirs) section=outputs ;;
 	*)
-		if [ "$section" = inputs ]; then
-			case "$(basename "$arg")" in
-			main*.c) mains+=("$arg") ;;
+		if [ "${section}" = inputs ]; then
+			case "$(basename "${arg}")" in
+			main*.c) mains+=("${arg}") ;;
 			esac
 		fi
 		;;
@@ -69,56 +69,56 @@ if [ "${#mains[@]}" -eq 0 ]; then
 fi
 
 for main in "${mains[@]}"; do
-	dir="$(dirname "$main")"
-	tag="$(basename "$main")"
+	dir="$(dirname "${main}")"
+	tag="$(basename "${main}")"
 	tag="${tag#main_}"
 	tag="${tag%.c}"
 
 	# Core: M0+ images carry cm0p in the name; everything else is M4.
-	if [[ "$tag" == *cm0p* ]]; then
+	if [[ "${tag}" == *cm0p* ]]; then
 		cpu=(-mcpu=cortex-m0plus -mthumb -mfloat-abi=soft)
 		defs=(-DSTM32WL55xx -DCORE_CM0PLUS)
-		startup="$COMMON/startup_stm32wl55jcix_cm0plus.s"
+		startup="${COMMON}/startup_stm32wl55jcix_cm0plus.s"
 		ld_name="STM32WL55JCIX_FLASH_CM0PLUS.ld"
-		hal_lib="$COMMON/libhal_rsc_cm0.a"
+		hal_lib="${COMMON}/libhal_rsc_cm0.a"
 	else
 		cpu=(-mcpu=cortex-m4 -mthumb -mfloat-abi=soft)
 		defs=(-DSTM32WL55xx -DCORE_CM4)
-		startup="$COMMON/startup_stm32wl55jcix.s"
+		startup="${COMMON}/startup_stm32wl55jcix.s"
 		ld_name="STM32WL55JCIX_FLASH_M4.ld"
-		hal_lib="$COMMON/libhal_rsc_cm4.a"
+		hal_lib="${COMMON}/libhal_rsc_cm4.a"
 	fi
 
 	# Per-exercise linker script override, else the common default (the
 	# Makefile's ld-m4 / ld-cm0 helpers).
-	ld="$dir/$ld_name"
-	if [ ! -f "$ld" ]; then
-		ld="$COMMON/$ld_name"
+	ld="${dir}/${ld_name}"
+	if [ ! -f "${ld}" ]; then
+		ld="${COMMON}/${ld_name}"
 	fi
 
-	includes=(-I"$CMSIS_INC/Include" -I"$CMSIS_INC/Device/ST/STM32WLxx/Include")
+	includes=(-I"${CMSIS_INC}/Include" -I"${CMSIS_INC}/Device/ST/STM32WLxx/Include")
 	libs=()
-	if [[ "$tag" == *hal* ]]; then
+	if [[ "${tag}" == *hal* ]]; then
 		defs+=(-DUSE_HAL_DRIVER)
-		includes+=(-I"$HAL_DRV/Inc" -I"$HAL_DRV/Inc/Legacy" -I"$COMMON")
-		libs=("$hal_lib")
+		includes+=(-I"${HAL_DRV}/Inc" -I"${HAL_DRV}/Inc/Legacy" -I"${COMMON}")
+		libs=("${hal_lib}")
 	fi
 
-	elf="$dir/app_$tag.elf"
-	map="$dir/app_$tag.map"
-	bin="$dir/firmware_$tag.bin"
-	rm -f "$elf" "$map" "$bin"
+	elf="${dir}/app_${tag}.elf"
+	map="${dir}/app_${tag}.map"
+	bin="${dir}/firmware_${tag}.bin"
+	rm -f "${elf}" "${map}" "${bin}"
 
-	echo "  IMG   $elf"
-	"$CC" "${cpu[@]}" "${defs[@]}" "${includes[@]}" \
+	echo "  IMG   ${elf}"
+	"${CC}" "${cpu[@]}" "${defs[@]}" "${includes[@]}" \
 		-Wall -Wextra -O2 -g3 -ffunction-sections -fdata-sections \
 		-Wl,--gc-sections --specs=nano.specs --specs=nosys.specs \
-		-T"$ld" -Wl,-Map="$map" \
-		-o "$elf" "$main" "$COMMON/system_stm32wlxx.c" "$startup" \
-		"${libs[@]}" 2>&1 | grep -vE "$LD_NOISE" || true
-	if [ ! -f "$elf" ]; then
-		echo "$0: build failed for $main" >&2
+		-T"${ld}" -Wl,-Map="${map}" \
+		-o "${elf}" "${main}" "${COMMON}/system_stm32wlxx.c" "${startup}" \
+		"${libs[@]}" 2>&1 | grep -vE "${LD_NOISE}" || true
+	if [ ! -f "${elf}" ]; then
+		echo "$0: build failed for ${main}" >&2
 		exit 1
 	fi
-	"$OBJCOPY" -O binary "$elf" "$bin"
+	"${OBJCOPY}" -O binary "${elf}" "${bin}"
 done

@@ -13,7 +13,7 @@ int main(void) {
     GPIOB->MODER |= (GPIO_MODER_MODE15_0 | GPIO_MODER_MODE9_0 | GPIO_MODER_MODE11_0);
 
     // Array of pin masks for the LEDs (LD1=PB15, LD2=PB9, LD3=PB11)
-    uint32_t leds[] = {GPIO_ODR_OD15, GPIO_ODR_OD9, GPIO_ODR_OD11};
+    const uint32_t leds[] = {GPIO_ODR_OD15, GPIO_ODR_OD9, GPIO_ODR_OD11};
     int led_index = 0;
     int direction = 1;
 

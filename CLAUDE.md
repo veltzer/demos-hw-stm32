@@ -59,6 +59,8 @@ which is split into two trees plus shared support:
   images, one per core (see below).
 - `exercises/common/` — shared CMSIS / startup / linker support for both.
 
+How the build discovers and classifies exercises:
+
 - The set of buildable exercises is **discovered from the filesystem**, not
   hardcoded: the directory tree IS the classification. Everything under
   `single_core/` with a `main.c` builds one M4 image; everything under

@@ -34,7 +34,7 @@ src_dirs = ["scripts", "exercises"]
 
 [processor.shellcheck]
 src_dirs = ["scripts"]
-args = ["--severity=error", "--shell=bash"]
+src_files = [".auto.enter.sh", ".auto.exit.sh"]
 src_extensions = [".sh"]
 
 # ─── toml / yaml / json ──────────────────────────────────────────────────────
@@ -316,3 +316,13 @@ output_files = [
 # lint the GitHub Actions workflow files with actionlint
 [processor.actionlint]
 src_dirs = [".github/workflows"]
+
+# ─── c / c++ ─────────────────────────────────────────────────────────────────
+
+[processor.cppcheck]
+src_dirs = ["examples", "exercises"]
+args = [
+	"--error-exitcode=1",
+	"--enable=warning,style,performance,portability",
+	"--inline-suppr",
+]

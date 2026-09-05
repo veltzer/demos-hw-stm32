@@ -6,6 +6,7 @@
 # (For the exercises you usually want scripts/flash_exercise.sh, which builds
 #  then flashes via st-flash. This is the CubeIDE-CLI equivalent.)
 
+# shellcheck source=scripts/cubeide.sh disable=SC1091
 source "$(dirname "$0")/cubeide.sh"
 
 if [ "$#" -lt 1 ]; then

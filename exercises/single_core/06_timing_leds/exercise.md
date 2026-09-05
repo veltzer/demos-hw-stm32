@@ -1,4 +1,4 @@
-# Basic Timer for Precise LED Blinking 
+# Basic Timer for Precise LED Blinking
 
 While you can create delays with simple software loops, these are imprecise. This exercise toggles an LED at a precise interval — exactly once per second — using a real hardware time base instead of a busy loop. The bare-metal solution uses the TIM16 timer; the HAL solution uses the SysTick-based `HAL_Delay` (the HAL set vendored here does not include the TIM driver, and SysTick is the idiomatic HAL time base anyway).
 

@@ -2,6 +2,7 @@
 
 # reset everything
 
+# shellcheck source=scripts/cubeide.sh disable=SC1091
 source "$(dirname "$0")/cubeide.sh"
 
 # mode=UR (connect under reset): the running firmware can hold the SWD lines so

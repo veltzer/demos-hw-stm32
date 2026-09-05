@@ -14,6 +14,7 @@
 ST_VID="0483"
 STLINK_V3_PID="374e"
 
+# shellcheck source=scripts/cubeide.sh disable=SC1091
 source "$(dirname "$0")/cubeide.sh"
 
 red()   { printf '\033[31m%s\033[0m\n' "$*"; }

@@ -27,7 +27,7 @@ static int     current;
 
 // Enter a new task on its own stack (top of the array, full-descending).
 static void __attribute__((noreturn))
-start_on_stack(void (*entry)(void), uint32_t *stack_top) {
+start_on_stack(void (*entry)(void), const uint32_t *stack_top) {
     __asm volatile(
         "mov sp, %0\n"
         "blx %1\n"
@@ -76,7 +76,7 @@ static void scheduler(void) {
         current = (current + 1) % NUM_TASKS;
         if (!tasks[current].started) {
             tasks[current].started = 1;
-            uint32_t *top = &tasks[current].stack[256];
+            const uint32_t *top = &tasks[current].stack[256];
             start_on_stack(task_entries[current], top);
         } else {
             longjmp(tasks[current].context, 1);
