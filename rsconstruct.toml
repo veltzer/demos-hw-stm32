@@ -1,6 +1,8 @@
 # rsconstruct build configuration for this repository.
 
 [build]
+# src_dirs entries name directories; "." (the whole tree) is a config error
+reject_dot_src_dirs = true
 
 # ─── analyzers ───────────────────────────────────────────────────────────────
 
@@ -13,7 +15,8 @@
 # ─── markdown ────────────────────────────────────────────────────────────────
 
 [processor.rumdl]
-src_dirs = ["."]
+src_dirs = ["doc", "exercises"]
+src_files = ["CLAUDE.md", "README.md"]
 src_exclude_dirs = "${generated_excludes}"
 
 [processor.zspell]
@@ -40,7 +43,7 @@ src_extensions = [".sh"]
 # ─── toml / yaml / json ──────────────────────────────────────────────────────
 
 [processor.taplo]
-src_dirs = ["."]
+src_files = [".rumdl.toml", "pyproject.toml", "rsconstruct.toml"]
 src_exclude_dirs = "${generated_excludes}"
 
 # ─── repo-specific configuration ────────────────────────────────────────────
