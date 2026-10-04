@@ -14,33 +14,33 @@ reject_dot_src_dirs = true
 
 # ─── markdown ────────────────────────────────────────────────────────────────
 
-[processor.rumdl]
+[processor.checker.rumdl]
 src_dirs = ["doc", "exercises"]
 src_files = ["CLAUDE.md", "README.md"]
 src_exclude_dirs = "${generated_excludes}"
 
-[processor.zspell]
+[processor.checker.zspell]
 src_dirs = ["exercises"]
 
 # ─── python ──────────────────────────────────────────────────────────────────
 
-[processor.ruff]
+[processor.checker.ruff]
 src_dirs = ["scripts", "exercises"]
 
 
-[processor.mypy]
+[processor.checker.mypy]
 src_dirs = ["scripts", "exercises"]
 
 # ─── shell ───────────────────────────────────────────────────────────────────
 
-[processor.shellcheck]
+[processor.checker.shellcheck]
 src_dirs = ["scripts"]
 src_files = [".auto.enter.sh", ".auto.exit.sh"]
 src_extensions = [".sh"]
 
 # ─── toml / yaml / json ──────────────────────────────────────────────────────
 
-[processor.taplo]
+[processor.checker.taplo]
 src_files = [".rumdl.toml", "pyproject.toml", "rsconstruct.toml"]
 src_exclude_dirs = "${generated_excludes}"
 
@@ -52,13 +52,13 @@ generated_excludes = [
 	"/STM32CubeWL/",
 ]
 
-[processor.cc_single_file]
+[processor.generator.cc_single_file]
 src_dirs = ["examples"]
 src_extensions = [".cc"]
 output_dir = "."
 cxxflags = ["-Wall", "-O2"]
 
-[processor.explicit.hal_lib_cm4]
+[processor.explicit.generic.hal_lib_cm4]
 command = "scripts/rsc_build_hal_lib.sh"
 args = ["cm4"]
 required_tools = ["arm-none-eabi-gcc", "arm-none-eabi-ar"]
@@ -69,7 +69,7 @@ inputs = [
 ]
 output_files = ["exercises/common/libhal_rsc_cm4.a"]
 
-[processor.explicit.hal_lib_cm0]
+[processor.explicit.generic.hal_lib_cm0]
 command = "scripts/rsc_build_hal_lib.sh"
 args = ["cm0"]
 required_tools = ["arm-none-eabi-gcc", "arm-none-eabi-ar"]
@@ -80,7 +80,7 @@ inputs = [
 ]
 output_files = ["exercises/common/libhal_rsc_cm0.a"]
 
-[processor.explicit.fw_single_bare]
+[processor.explicit.generic.fw_single_bare]
 command = "scripts/rsc_build_image.sh"
 required_tools = ["arm-none-eabi-gcc", "arm-none-eabi-objcopy"]
 inputs = [
@@ -132,7 +132,7 @@ output_files = [
 	"exercises/single_core/11_os_preempt_two_stacks/firmware_bare.bin",
 ]
 
-[processor.explicit.fw_single_hal]
+[processor.explicit.generic.fw_single_hal]
 command = "scripts/rsc_build_image.sh"
 required_tools = ["arm-none-eabi-gcc", "arm-none-eabi-objcopy"]
 inputs = [
@@ -186,7 +186,7 @@ output_files = [
 	"exercises/single_core/11_os_preempt_two_stacks/firmware_hal.bin",
 ]
 
-[processor.explicit.fw_dual_cm4_bare]
+[processor.explicit.generic.fw_dual_cm4_bare]
 command = "scripts/rsc_build_image.sh"
 required_tools = ["arm-none-eabi-gcc", "arm-none-eabi-objcopy"]
 inputs = [
@@ -217,7 +217,7 @@ output_files = [
 	"exercises/dual_core/04_atomic_increment/firmware_cm4_bare.bin",
 ]
 
-[processor.explicit.fw_dual_cm0p_bare]
+[processor.explicit.generic.fw_dual_cm0p_bare]
 command = "scripts/rsc_build_image.sh"
 required_tools = ["arm-none-eabi-gcc", "arm-none-eabi-objcopy"]
 inputs = [
@@ -248,7 +248,7 @@ output_files = [
 	"exercises/dual_core/04_atomic_increment/firmware_cm0p_bare.bin",
 ]
 
-[processor.explicit.fw_dual_cm4_hal]
+[processor.explicit.generic.fw_dual_cm4_hal]
 command = "scripts/rsc_build_image.sh"
 required_tools = ["arm-none-eabi-gcc", "arm-none-eabi-objcopy"]
 inputs = [
@@ -281,7 +281,7 @@ output_files = [
 	"exercises/dual_core/04_atomic_increment/firmware_cm4_hal.bin",
 ]
 
-[processor.explicit.fw_dual_cm0p_hal]
+[processor.explicit.generic.fw_dual_cm0p_hal]
 command = "scripts/rsc_build_image.sh"
 required_tools = ["arm-none-eabi-gcc", "arm-none-eabi-objcopy"]
 inputs = [
@@ -315,12 +315,12 @@ output_files = [
 ]
 
 # lint the GitHub Actions workflow files with actionlint
-[processor.actionlint]
+[processor.checker.actionlint]
 src_dirs = [".github/workflows"]
 
 # ─── c / c++ ─────────────────────────────────────────────────────────────────
 
-[processor.cppcheck]
+[processor.checker.cppcheck]
 src_dirs = ["examples", "exercises"]
 args = [
 	"--error-exitcode=1",
