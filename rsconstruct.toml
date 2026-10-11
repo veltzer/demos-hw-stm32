@@ -33,10 +33,13 @@ src_dirs = ["scripts", "exercises"]
 
 # ─── shell ───────────────────────────────────────────────────────────────────
 
-[processor.checker.shellcheck]
+# the scripts source each other: shellcheck, given all of them at once,
+# followed those; ishellcheck checks each file alone, so it needs -x
+[processor.checker.ishellcheck]
 src_dirs = ["scripts"]
 src_files = [".auto.enter.sh", ".auto.exit.sh"]
 src_extensions = [".sh"]
+external_sources = true
 
 # ─── toml / yaml / json ──────────────────────────────────────────────────────
 
