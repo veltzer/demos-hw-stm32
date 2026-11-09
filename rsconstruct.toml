@@ -66,9 +66,11 @@ command = "scripts/rsc_build_hal_lib.sh"
 args = ["cm4"]
 required_tools = ["arm-none-eabi-gcc", "arm-none-eabi-ar"]
 # clone_cubewl.sh fetches STM32CubeWL from GitHub on first use (gitignored
-# vendor source, not an output) under a lock file beside it.
+# vendor source, not an output) under a lock file beside it. The script also
+# keeps its compiled objects in exercises/common/.rsc_hal_obj_cm4 so a re-run
+# only recompiles what changed: an incremental cache, not an output.
 sandbox_network = true
-sandbox_writable = ["STM32CubeWL", ".cubewl.lock"]
+sandbox_writable = ["STM32CubeWL", ".cubewl.lock", "exercises/common/.rsc_hal_obj_cm4"]
 inputs = [
 	"scripts/rsc_build_hal_lib.sh",
 	"scripts/clone_cubewl.sh",
@@ -81,9 +83,11 @@ command = "scripts/rsc_build_hal_lib.sh"
 args = ["cm0"]
 required_tools = ["arm-none-eabi-gcc", "arm-none-eabi-ar"]
 # clone_cubewl.sh fetches STM32CubeWL from GitHub on first use (gitignored
-# vendor source, not an output) under a lock file beside it.
+# vendor source, not an output) under a lock file beside it. The script also
+# keeps its compiled objects in exercises/common/.rsc_hal_obj_cm0 so a re-run
+# only recompiles what changed: an incremental cache, not an output.
 sandbox_network = true
-sandbox_writable = ["STM32CubeWL", ".cubewl.lock"]
+sandbox_writable = ["STM32CubeWL", ".cubewl.lock", "exercises/common/.rsc_hal_obj_cm0"]
 inputs = [
 	"scripts/rsc_build_hal_lib.sh",
 	"scripts/clone_cubewl.sh",
