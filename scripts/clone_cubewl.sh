@@ -25,10 +25,11 @@ if [ -f "${MARKER}" ]; then
 	exit 0
 fi
 
-# Serialise the clone. The lock file sits beside the destination (not inside
-# it -- the clone would have to create the directory first) and is left in
-# place; it is gitignored along with the tree it guards.
-exec 9>"${HERE}/.cubewl.lock"
+# Serialise the clone. The lock file cannot sit inside the destination (the
+# clone would have to create the directory first), so it lives in the
+# gitignored out/ and is left in place there.
+mkdir -p "${HERE}/out"
+exec 9>"${HERE}/out/.cubewl.lock"
 flock 9
 
 # Re-check under the lock: another caller may have finished while we waited.

@@ -5,7 +5,6 @@ Findings from a code scan on 2026-10-04.
 ## High
 
 - `scripts/download_cubeide.py:22-39` - when `playwright` is not importable, the script re-execs itself under `~/.venv/bin/python` (documented in `CLAUDE.md:169-173`). The repo already declares `playwright` in `pyproject.toml:5-7`, so the tool must come from the repo's own `.venv`; a script that only works because of the personal `~/.venv` is a repo bug. Remove `_reexec_in_venv()` and fail with a message telling the user to `uv sync` in the repo; fix the CLAUDE.md paragraph accordingly.
-- `scripts/clone_cubewl.sh:28-31` - creates `.cubewl.lock` in the repo root and claims it is gitignored, but `.gitignore` only covers `/STM32CubeWL/` (`git check-ignore .cubewl.lock` matches nothing), so the first cold build leaves an untracked file and `rsconstruct status`/`git status` go dirty. Fleet-wide shared file: add `/.cubewl.lock` to the shared `.gitignore` next to the existing `/STM32CubeWL/` entry.
 
 ## Medium
 
