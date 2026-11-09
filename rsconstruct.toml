@@ -65,6 +65,10 @@ cxxflags = ["-Wall", "-O2"]
 command = "scripts/rsc_build_hal_lib.sh"
 args = ["cm4"]
 required_tools = ["arm-none-eabi-gcc", "arm-none-eabi-ar"]
+# clone_cubewl.sh fetches STM32CubeWL from GitHub on first use (gitignored
+# vendor source, not an output) under a lock file beside it.
+sandbox_network = true
+sandbox_writable = ["STM32CubeWL", ".cubewl.lock"]
 inputs = [
 	"scripts/rsc_build_hal_lib.sh",
 	"scripts/clone_cubewl.sh",
@@ -76,6 +80,10 @@ output_files = ["exercises/common/libhal_rsc_cm4.a"]
 command = "scripts/rsc_build_hal_lib.sh"
 args = ["cm0"]
 required_tools = ["arm-none-eabi-gcc", "arm-none-eabi-ar"]
+# clone_cubewl.sh fetches STM32CubeWL from GitHub on first use (gitignored
+# vendor source, not an output) under a lock file beside it.
+sandbox_network = true
+sandbox_writable = ["STM32CubeWL", ".cubewl.lock"]
 inputs = [
 	"scripts/rsc_build_hal_lib.sh",
 	"scripts/clone_cubewl.sh",
@@ -86,6 +94,10 @@ output_files = ["exercises/common/libhal_rsc_cm0.a"]
 [processor.explicit.generic.fw_single_bare]
 command = "scripts/rsc_build_image.sh"
 required_tools = ["arm-none-eabi-gcc", "arm-none-eabi-objcopy"]
+# clone_cubewl.sh fetches STM32CubeWL from GitHub on first use (gitignored
+# vendor source, not an output) under a lock file beside it.
+sandbox_network = true
+sandbox_writable = ["STM32CubeWL", ".cubewl.lock"]
 inputs = [
 	"scripts/rsc_build_image.sh",
 	"exercises/common/system_stm32wlxx.c",
@@ -138,6 +150,10 @@ output_files = [
 [processor.explicit.generic.fw_single_hal]
 command = "scripts/rsc_build_image.sh"
 required_tools = ["arm-none-eabi-gcc", "arm-none-eabi-objcopy"]
+# clone_cubewl.sh fetches STM32CubeWL from GitHub on first use (gitignored
+# vendor source, not an output) under a lock file beside it.
+sandbox_network = true
+sandbox_writable = ["STM32CubeWL", ".cubewl.lock"]
 inputs = [
 	"scripts/rsc_build_image.sh",
 	"exercises/common/system_stm32wlxx.c",
@@ -192,6 +208,10 @@ output_files = [
 [processor.explicit.generic.fw_dual_cm4_bare]
 command = "scripts/rsc_build_image.sh"
 required_tools = ["arm-none-eabi-gcc", "arm-none-eabi-objcopy"]
+# clone_cubewl.sh fetches STM32CubeWL from GitHub on first use (gitignored
+# vendor source, not an output) under a lock file beside it.
+sandbox_network = true
+sandbox_writable = ["STM32CubeWL", ".cubewl.lock"]
 inputs = [
 	"scripts/rsc_build_image.sh",
 	"exercises/common/system_stm32wlxx.c",
@@ -223,6 +243,10 @@ output_files = [
 [processor.explicit.generic.fw_dual_cm0p_bare]
 command = "scripts/rsc_build_image.sh"
 required_tools = ["arm-none-eabi-gcc", "arm-none-eabi-objcopy"]
+# clone_cubewl.sh fetches STM32CubeWL from GitHub on first use (gitignored
+# vendor source, not an output) under a lock file beside it.
+sandbox_network = true
+sandbox_writable = ["STM32CubeWL", ".cubewl.lock"]
 inputs = [
 	"scripts/rsc_build_image.sh",
 	"exercises/common/system_stm32wlxx.c",
@@ -254,6 +278,10 @@ output_files = [
 [processor.explicit.generic.fw_dual_cm4_hal]
 command = "scripts/rsc_build_image.sh"
 required_tools = ["arm-none-eabi-gcc", "arm-none-eabi-objcopy"]
+# clone_cubewl.sh fetches STM32CubeWL from GitHub on first use (gitignored
+# vendor source, not an output) under a lock file beside it.
+sandbox_network = true
+sandbox_writable = ["STM32CubeWL", ".cubewl.lock"]
 inputs = [
 	"scripts/rsc_build_image.sh",
 	"exercises/common/system_stm32wlxx.c",
@@ -287,6 +315,10 @@ output_files = [
 [processor.explicit.generic.fw_dual_cm0p_hal]
 command = "scripts/rsc_build_image.sh"
 required_tools = ["arm-none-eabi-gcc", "arm-none-eabi-objcopy"]
+# clone_cubewl.sh fetches STM32CubeWL from GitHub on first use (gitignored
+# vendor source, not an output) under a lock file beside it.
+sandbox_network = true
+sandbox_writable = ["STM32CubeWL", ".cubewl.lock"]
 inputs = [
 	"scripts/rsc_build_image.sh",
 	"exercises/common/system_stm32wlxx.c",
