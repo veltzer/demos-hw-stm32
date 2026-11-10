@@ -2,22 +2,24 @@
 #
 # Usage:
 #   make                       # build every exercise (incremental)
-#   make 02_serial_counter     # build just one exercise (by bare name)
+#   make 03_serial_counter     # build just one exercise (by bare name)
 #   make list                  # list the exercises that will be built
 #   make clean
 #   make V=1 ...               # verbose: echo the underlying commands
 #   make -j                    # exercises build in parallel
 #
 # This Makefile lives at the repo root and operates on two exercise trees:
-#   exercises/singlecore/NN_name/  - one main.c, built into one M4 image
-#   exercises/dualcore/NN_name/    - main_cm4.c + main_cm0p.c, built into two
-#                                    images (one per core, non-overlapping flash)
+#   exercises/single_core/NN_name/ - main_bare.c and main_hal.c, each built
+#                                    into its own M4 image
+#   exercises/dual_core/NN_name/   - main_cm4_<v>.c + main_cm0p_<v>.c per variant
+#                                    (bare, hal), one image per core
+#                                    (non-overlapping flash)
 # Both link against the shared CMSIS / startup / linker support under
 # exercises/common/. The directory tree IS the single-vs-dual classification.
 # Builds are incremental (per-object compilation, -MMD header deps).
 #
 # Sourceless dirs (e.g. an exercise that is just a write-up) are ignored, since
-# discovery keys off the presence of main.c / main_cm4.c.
+# discovery keys off the presence of main_bare.c / main_cm4_bare.c.
 
 # ---- verbosity -------------------------------------------------------------
 # Quiet by default; `make V=1` shows the actual commands.
@@ -49,7 +51,8 @@ DEFS    := -DSTM32WL55xx -DCORE_CM4
 #   exercises/single_core/NN_name/ - main_bare.c (register-level) AND main_hal.c
 #                                    (same lesson via the HAL); each builds its
 #                                    own M4 image (firmware_bare.bin / _hal.bin).
-#   exercises/dual_core/NN_name/   - main_cm4.c + main_cm0p.c, one image per core.
+#   exercises/dual_core/NN_name/   - main_cm4_<v>.c + main_cm0p_<v>.c, one image
+#                                    per core per variant.
 # Our customized startup/linker/system live in exercises/common/; the vendor
 # CMSIS and HAL come from the STM32CubeWL clone (gitignored, see CUBEWL below).
 DIR     := exercises

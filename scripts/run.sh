@@ -3,8 +3,8 @@
 # STM32_Programmer_CLI.
 # usage: scripts/run.sh <file.elf|file.bin>
 #
-# (For the exercises you usually want scripts/flash_exercise.sh, which builds
-#  then flashes via st-flash. This is the CubeIDE-CLI equivalent.)
+# (For the exercises you usually want scripts/flash_exercise.sh, which flashes a
+#  pre-built exercise by name, handling both cores of a dual-core one.)
 
 # shellcheck source=scripts/cubeide.sh disable=SC1091
 source "$(dirname "$0")/cubeide.sh"

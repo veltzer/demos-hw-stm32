@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 """Headless, unattended download of the latest STM32CubeIDE generic Linux
 installer from st.com using Playwright (no AI, no manual browser steps).
 
@@ -15,46 +15,21 @@ Usage:
 
 Exit codes: 0 ok, 2 bad/missing credentials, 3 download/flow failure.
 """
+import argparse
 import os
+import re
+import subprocess
 import sys
+import urllib.error
+import urllib.request
+from pathlib import Path
 
-
-# If playwright isn't importable here but the user's venv has it, re-exec under
-# that interpreter. Lets this single script "just work" without a wrapper.
-def _reexec_in_venv():
-    try:
-        # deliberate probe: the import is the test, hence unused and local.
-        import playwright  # noqa: F401  # pylint: disable=import-outside-toplevel,unused-import
-        return  # already good
-    except ImportError:
-        pass
-    venv_py = os.path.expanduser("~/.venv/bin/python")
-    if (os.path.isfile(venv_py)
-            and os.path.realpath(venv_py) != os.path.realpath(sys.executable)
-            and not os.environ.get("_CUBEIDE_REEXEC")):
-        os.environ["_CUBEIDE_REEXEC"] = "1"
-        os.execv(venv_py, [venv_py, os.path.abspath(__file__), *sys.argv[1:]])
-
-
-_reexec_in_venv()
-
-# The imports below must follow _reexec_in_venv(): the re-exec has to happen
-# before anything that may pull in playwright-dependent machinery, so they
-# cannot be hoisted to the top of the file.
-#
 # This script drives a third-party site whose markup changes without notice,
 # so every step is best-effort: broad `except Exception` around each probe is
 # deliberate (a failed step must fall through to the next strategy, never
 # abort the run). The main() flow is correspondingly long and linear, and the
-# playwright imports are deferred so the script can re-exec first.
-# pylint: disable=broad-exception-caught,wrong-import-position
-# pylint: disable=too-many-statements,import-outside-toplevel,unused-import
-import argparse
-import re
-import subprocess
-import urllib.error
-import urllib.request
-from pathlib import Path
+# playwright imports are deferred so a missing playwright gets a clear message.
+# pylint: disable=broad-exception-caught,too-many-statements,import-outside-toplevel
 
 CUBEIDE_URL = "https://www.st.com/en/development-tools/stm32cubeide.html"
 LOGIN_HINT = "https://www.st.com/content/st_com/en/user/login.html"
@@ -366,8 +341,8 @@ def main() -> int:
         from playwright.sync_api import TimeoutError as PWTimeout
         from playwright.sync_api import sync_playwright
     except ImportError:
-        sys.exit("error: playwright not installed (pip install playwright; "
-                 "playwright install chromium)")
+        sys.exit("error: playwright not installed. Run 'uv sync' in the repo "
+                 "and use its .venv, then 'playwright install chromium'.")
 
     nav_ms = args.timeout * 1000
     with sync_playwright() as p:

@@ -9,7 +9,6 @@ dependencies = [
 [dependency-groups]
 dev = [
     "pyrefly",
-    "pytest",
     "ruff",
 ]
 

@@ -1,7 +1,7 @@
 #!/bin/bash -eu
 # Build the shared STM32WL HAL driver static library for one core, for
-# rsconstruct. Invoked by the [processor.explicit.hal_lib_*] stanzas in
-# rsconstruct.local.toml as:
+# rsconstruct. Invoked by the [processor.explicit.generic.hal_lib_*] stanzas in
+# rsconstruct.toml as:
 #   rsc_build_hal_lib.sh <cm4|cm0> --inputs <triggers...> --output-files <lib>
 #
 # Mirrors the Makefile's HAL library rules: every non-template STM32CubeWL HAL

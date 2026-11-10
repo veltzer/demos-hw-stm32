@@ -2,8 +2,8 @@
 # flash a pre-built exercise to the board with STM32_Programmer_CLI.
 # This script does NOT build -- run `make <exercise>` first.
 # usage: scripts/flash_exercise.sh <exercise> [bare|hal]
-#   scripts/flash_exercise.sh 02_serial_counter        # single-core, bare (default)
-#   scripts/flash_exercise.sh 02_serial_counter hal    # single-core, HAL
+#   scripts/flash_exercise.sh 03_serial_counter        # single-core, bare (default)
+#   scripts/flash_exercise.sh 03_serial_counter hal    # single-core, HAL
 #   scripts/flash_exercise.sh 00_dual_blink bare       # dual-core: flashes BOTH
 #                                                      # cores (M4 bank1 + M0+ bank2)
 HERE="$(dirname "$0")/.."

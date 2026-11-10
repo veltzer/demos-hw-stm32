@@ -54,28 +54,30 @@ copies). Each `main_hal.c` defines its own `SysTick_Handler` (forwarding to
 `Makefile` lives at the repo root and builds the exercises under `exercises/`,
 which is split into two trees plus shared support:
 
-- `exercises/single_core/NN_name/` — one `main.c`, built into a single M4 image.
-- `exercises/dual_core/NN_name/` — `main_cm4.c` + `main_cm0p.c`, built into two
-  images, one per core (see below).
+- `exercises/single_core/NN_name/` — `main_bare.c` (register-level) and
+  `main_hal.c` (the same lesson via the HAL), each built into its own M4 image.
+- `exercises/dual_core/NN_name/` — `main_cm4_<v>.c` + `main_cm0p_<v>.c` for each
+  variant `<v>` (`bare`, `hal`), built into two images per variant, one per
+  core (see below).
 - `exercises/common/` — shared CMSIS / startup / linker support for both.
 
 How the build discovers and classifies exercises:
 
 - The set of buildable exercises is **discovered from the filesystem**, not
   hardcoded: the directory tree IS the classification. Everything under
-  `single_core/` with a `main.c` builds one M4 image; everything under
-  `dual_core/` with a `main_cm4.c` builds two. Sourceless dirs (e.g. a
+  `single_core/` with a `main_bare.c` builds its M4 images; everything under
+  `dual_core/` with a `main_cm4_bare.c` builds both cores. Sourceless dirs (e.g. a
   write-up-only exercise) are ignored, since discovery keys off the source
   files' presence.
-- Dual-core exercises build an M4 image (`app_cm4.elf`/`firmware_cm4.bin`) from
-  `main_cm4.c` and an M0+ image (`app_cm0p.elf`/`firmware_cm0p.bin`) from
-  `main_cm0p.c`. The M0+ uses its own startup (`startup_stm32wl55jcix_cm0plus.s`,
+- Dual-core exercises build, per variant, an M4 image
+  (`app_cm4_<v>.elf`/`firmware_cm4_<v>.bin`) from `main_cm4_<v>.c` and an M0+
+  image (`app_cm0p_<v>.elf`/`firmware_cm0p_<v>.bin`) from `main_cm0p_<v>.c`.
+  The M0+ uses its own startup (`startup_stm32wl55jcix_cm0plus.s`,
   the smaller M0+ vector table) and linker script
   (`STM32WL55JCIX_FLASH_CM0PLUS.ld`, flash bank 2 @ `0x08020000`, SRAM2 @
   `0x20008000`) so the two cores' images never overlap. Compiled with
-  `-mcpu=cortex-m0plus -DCORE_CM0PLUS`. **Building is done; actually running the
-  M0+ still needs the `C2BOOT`/`SBRV` option bytes set and both images flashed —
-  that is a separate, deliberate step and is not automated here.**
+  `-mcpu=cortex-m0plus -DCORE_CM0PLUS`. Flashing both images is covered under
+  "Flashing" below.
 - Each exercise links its `main*.c` against the shared CMSIS / startup / linker
   support in `exercises/common/` (copied from the CubeIDE `workspace/blink`
   project; the `workspace/` tree itself is generated IDE output).
@@ -90,13 +92,14 @@ How the build discovers and classifies exercises:
   (the chip has **no FPU**, `__FPU_PRESENT == 0`), with `-DSTM32WL55xx
   -DCORE_CM4`.
 - Builds are incremental (per-object compilation, `-MMD` header deps). Output
-  per exercise: `app.elf`, `firmware.bin`, `app.map`; intermediates in `.obj/`.
+  per image: `app_<tag>.elf`, `firmware_<tag>.bin`, `app_<tag>.map` (`<tag>` is
+  `bare`, `hal`, `cm4_bare`, ...); intermediates in `.obj/`.
   All are gitignored.
 
 Commands:
 
     make                 # build all single-core exercises (incremental)
-    make 02_serial_counter   # build one exercise by name
+    make 03_serial_counter   # build one exercise by name
     make list            # list discovered exercises
     make clean
     make -k              # keep going past a broken exercise
@@ -107,21 +110,21 @@ Commands:
 
 `rsconstruct build` also builds ALL the firmware (plus the host examples), to
 the **same in-tree paths** as make, so the flash scripts work with either
-build system. The wiring lives at the bottom of `rsconstruct.local.toml`:
+build system. The wiring lives in `rsconstruct.toml`:
 
-- `[processor.explicit.hal_lib_cm4/cm0]` build the shared HAL driver
+- `[processor.explicit.generic.hal_lib_cm4/cm0]` build the shared HAL driver
   libraries via `scripts/rsc_build_hal_lib.sh` into
   `exercises/common/libhal_rsc_<core>.a` (separate names/objects from make's
   `libhal_<core>.a` so the two systems never share intermediates). Their
   declared outputs give the HAL image products dependency edges, so ordering
   is correct even on a cold build.
-- Six `[processor.explicit.fw_*]` products mirror the Makefile's six IMAGE
+- Six `[processor.explicit.generic.fw_*]` products mirror the Makefile's six IMAGE
   classes (single bare/hal, dual cm4/cm0p x bare/hal) via
   `scripts/rsc_build_image.sh`. Inputs are glob-discovered `main*.c` like
   make's discovery; `output_files` are enumerated, so a NEW exercise builds
   automatically but must be added to the stanza's `output_files` list to be
   cached/cleaned.
-- `[processor.cc_single_file]` builds `examples/*.cc` to `examples/*.elf`.
+- `[processor.generator.cc_single_file]` builds `examples/*.cc` to `examples/*.elf`.
 
 Rebuild granularity is per image class (not per object); each image is one
 compile+link of three small TUs. HAL images are functionally identical to
@@ -166,11 +169,11 @@ installer from st.com, **fully unattended** (no AI / no manual browser steps).
 - It drives a headless browser via **Playwright** to perform st.com's
   JavaScript/SSO login and the download (plain curl/wget can't authenticate
   that flow).
-- Requires Playwright with a chromium browser. If run under a python without
-  playwright, the script re-execs itself under `~/.venv/bin/python` (where
-  playwright + browsers are installed); otherwise install with
-  `pip install playwright && playwright install chromium`. Not added to
-  `install_deps.sh` because the browser binaries are not an apt package.
+- Requires Playwright with a chromium browser. `playwright` is a dependency in
+  `pyproject.toml`: run `uv sync`, then run the script from the repo's
+  `.venv`, and install the browser once with `playwright install chromium`.
+  Not added to `install_deps.sh` because the browser binaries are not an apt
+  package.
 - Credentials: username from `$ST_USER` or `doc/user_and_password.txt`; password
   from `$ST_PASS` or `pass show sites/www.st.com` (override `ST_PASS_ENTRY`).
   The password is never printed or written to disk.
@@ -188,11 +191,6 @@ installer from st.com, **fully unattended** (no AI / no manual browser steps).
 - The `exercises/*/*/main*.c` are bare register-level programs. Some have
   genuine bugs that the build surfaces; the build system is a plain compiler and
   does not paper over them.
-- Dual-core exercises (under `exercises/dual_core/`, numbered from `00`) now
-  **build** both cores' images (M4 + M0+) via the from-scratch M0+
-  startup/linker under `exercises/common/`. They are **not flashed/run** yet:
-  that needs the `C2BOOT`/`SBRV` option bytes set so the M0+ boots from flash
-  bank 2, plus flashing both images (TODO).
 - The ST-LINK exposes a USB Virtual COM Port at `/dev/ttyACM0`. Serial output
   appears only if firmware transmits on a UART that is routed to that VCP, at a
   matching baud rate.

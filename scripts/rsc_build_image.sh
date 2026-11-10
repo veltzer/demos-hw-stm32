@@ -1,7 +1,7 @@
 #!/bin/bash -eu
 # Build STM32WL55 firmware images for rsconstruct.
 #
-# Invoked by the [processor.explicit.fw_*] stanzas in rsconstruct.local.toml as:
+# Invoked by the [processor.explicit.generic.fw_*] stanzas in rsconstruct.toml as:
 #   rsc_build_image.sh --inputs <files...> --output-files <files...>
 #
 # Every --inputs entry whose basename matches main*.c is built into three
@@ -110,13 +110,18 @@ for main in "${mains[@]}"; do
 	rm -f "${elf}" "${map}" "${bin}"
 
 	echo "  IMG   ${elf}"
+	# The filter drops known linker noise; gcc's own status, not grep's (which
+	# is 1 when every line was noise), decides whether the build failed.
+	set +e
 	"${CC}" "${cpu[@]}" "${defs[@]}" "${includes[@]}" \
 		-Wall -Wextra -O2 -g3 -ffunction-sections -fdata-sections \
 		-Wl,--gc-sections --specs=nano.specs --specs=nosys.specs \
 		-T"${ld}" -Wl,-Map="${map}" \
 		-o "${elf}" "${main}" "${COMMON}/system_stm32wlxx.c" "${startup}" \
-		"${libs[@]}" 2>&1 | grep -vE "${LD_NOISE}" || true
-	if [ ! -f "${elf}" ]; then
+		"${libs[@]}" 2>&1 | grep -vE "${LD_NOISE}"
+	cc_status="${PIPESTATUS[0]}"
+	set -e
+	if [ "${cc_status}" -ne 0 ] || [ ! -f "${elf}" ]; then
 		echo "$0: build failed for ${main}" >&2
 		exit 1
 	fi

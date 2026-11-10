@@ -25,11 +25,10 @@ src_dirs = ["exercises"]
 # ─── python ──────────────────────────────────────────────────────────────────
 
 [processor.checker.ruff]
-src_dirs = ["scripts", "exercises"]
-
+src_dirs = ["scripts"]
 
 [processor.checker.pyrefly]
-src_dirs = ["scripts", "exercises"]
+src_dirs = ["scripts"]
 
 # ─── shell ───────────────────────────────────────────────────────────────────
 
