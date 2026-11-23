@@ -9,8 +9,11 @@
 // and the PendSV register save/restore -- that is the exercise.
 #include "stm32wlxx_hal.h"
 
-void task1_function(void) { while (1) { /* blink LD1 */ } }
-void task2_function(void) { while (1) { /* blink LD2 */ } }
+static void task1_function(void) { while (1) { /* blink LD1 */ } }
+static void task2_function(void) { while (1) { /* blink LD2 */ } }
+
+// the table the scheduler would pick the next task from
+void (*const tasks[])(void) = { task1_function, task2_function };
 
 // Runs every millisecond: keep the HAL tick alive, then request a context switch
 // by pending the (lower-priority) PendSV exception.

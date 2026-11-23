@@ -1,7 +1,7 @@
 #include "stm32wl55xx.h"
 
 // Busy-wait delay. count is just a loop counter, not a real time unit.
-void delay(volatile uint32_t count) {
+static void delay(volatile uint32_t count) {
     while (count--);
 }
 

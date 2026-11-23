@@ -1,6 +1,6 @@
 #include "stm32wl55xx.h"
 
-void delay(volatile uint32_t count) {
+static void delay(volatile uint32_t count) {
     while (count--);
 }
 

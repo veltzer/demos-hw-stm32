@@ -8,7 +8,7 @@ static volatile uint32_t fake_tick;
 static uint32_t HAL_GetTick(void) { return ++fake_tick; }
 
 // --- Task 1: Blink LD1 slowly ---
-void task1_blink_slow(void) {
+static void task1_blink_slow(void) {
     static uint32_t last_run = 0;
     if ( (HAL_GetTick() - last_run) > 500 ) { // Using HAL_GetTick for simplicity here
         GPIOB->ODR ^= GPIO_ODR_OD15; // LD1 (blue, PB15)
@@ -17,7 +17,7 @@ void task1_blink_slow(void) {
 }
 
 // --- Task 2: Blink LD2 quickly ---
-void task2_blink_fast(void) {
+static void task2_blink_fast(void) {
     static uint32_t last_run = 0;
     if ( (HAL_GetTick() - last_run) > 100 ) {
         GPIOB->ODR ^= GPIO_ODR_OD9; // LD2 (green, PB9)

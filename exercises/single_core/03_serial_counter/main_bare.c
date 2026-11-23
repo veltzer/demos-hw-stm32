@@ -1,9 +1,9 @@
 #include "stm32wl55xx.h"
 #include <string.h>
 
-void delay(volatile uint32_t count) { while (count--); }
+static void delay(volatile uint32_t count) { while (count--); }
 
-void LPUART1_Init(void) {
+static void LPUART1_Init(void) {
     // Enable GPIOA and LPUART1 clocks
     RCC->AHB2ENR |= RCC_AHB2ENR_GPIOAEN;
     RCC->APB1ENR2 |= RCC_APB1ENR2_LPUART1EN;
@@ -23,7 +23,7 @@ void LPUART1_Init(void) {
     LPUART1->CR1 |= USART_CR1_TE | USART_CR1_UE;
 }
 
-void LPUART1_SendChar(char c) {
+static void LPUART1_SendChar(char c) {
     // Wait until the transmit data register can accept a byte, then write it.
     // We do NOT enable the TX FIFO (CR1.FIFOEN), so the right flag is
     // TXE_TXFNF (transmit data register empty) -- NOT TXFE, which only asserts
@@ -32,14 +32,14 @@ void LPUART1_SendChar(char c) {
     LPUART1->TDR = c;
 }
 
-void LPUART1_SendString(const char* str) {
+static void LPUART1_SendString(const char* str) {
     for (size_t i = 0; i < strlen(str); i++) {
         LPUART1_SendChar(str[i]);
     }
 }
 
 // Print an unsigned integer in decimal (no stdio / printf on bare metal).
-void LPUART1_SendUint(uint32_t value) {
+static void LPUART1_SendUint(uint32_t value) {
     char buf[11];      // enough for 2^32-1 (10 digits) + NUL
     int pos = 10;
     buf[pos] = '\0';

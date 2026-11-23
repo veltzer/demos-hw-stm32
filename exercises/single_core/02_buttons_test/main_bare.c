@@ -16,9 +16,9 @@
 //   B3 (PC6) LOW
 //   ...
 
-void delay(volatile uint32_t count) { while (count--); }
+static void delay(volatile uint32_t count) { while (count--); }
 
-void LPUART1_Init(void) {
+static void LPUART1_Init(void) {
     RCC->AHB2ENR  |= RCC_AHB2ENR_GPIOAEN;
     RCC->APB1ENR2 |= RCC_APB1ENR2_LPUART1EN;
 
@@ -32,7 +32,7 @@ void LPUART1_Init(void) {
     LPUART1->CR1 |= USART_CR1_TE | USART_CR1_UE;
 }
 
-void uart_puts(const char* s) {
+static void uart_puts(const char* s) {
     for (size_t i = 0; i < strlen(s); i++) {
         // No TX FIFO enabled -> poll TXE_TXFNF (not TXFE).
         while (!(LPUART1->ISR & USART_ISR_TXE_TXFNF));

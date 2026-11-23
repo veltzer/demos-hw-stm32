@@ -367,11 +367,15 @@ args = ["--offline", "--no-progress", "--persona=pedantic"]
 
 # ─── c / c++ ─────────────────────────────────────────────────────────────────
 
+# every main_*.c / example is a standalone image or program: one run per file
+# cppcheck.cfg declares the vector-table and HAL entrypoints cppcheck cannot see called
 [processor.checker.cppcheck]
+dep_inputs = ["cppcheck.cfg"]
 src_dirs = ["examples", "exercises"]
 args = [
 	"--error-exitcode=1",
-	"--enable=warning,style,performance,portability",
+	"--enable=warning,style,performance,portability,information,unusedFunction",
+	"--library=cppcheck.cfg",
 	"--check-level=exhaustive",
 	"--inline-suppr",
 ]

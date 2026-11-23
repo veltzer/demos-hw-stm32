@@ -17,6 +17,7 @@ Exit codes: 0 ok, 2 bad/missing credentials, 3 download/flow failure.
 """
 import argparse
 import contextlib
+import http.client
 import os
 import re
 import subprocess
@@ -38,7 +39,6 @@ except ImportError:
 # deliberate (a failed step must fall through to the next strategy, never
 # abort the run). The main() flow is correspondingly long and linear, and the
 # playwright imports are deferred so a missing playwright gets a clear message.
-# pylint: disable=broad-exception-caught,too-many-statements,import-outside-toplevel
 
 CUBEIDE_URL = "https://www.st.com/en/development-tools/stm32cubeide.html"
 LOGIN_HINT = "https://www.st.com/content/st_com/en/user/login.html"
@@ -71,7 +71,7 @@ def check_reachable(url=REACH_URL, timeout=10, attempts=4):
                 return True, f"HTTP {resp.status}"
         except urllib.error.HTTPError as e:
             return True, f"HTTP {e.code}"
-        except Exception as e:  # noqa: BLE001
+        except (OSError, http.client.HTTPException) as e:
             last = f"{type(e).__name__}: {e}"
 
     # urllib failed. st.com's Akamai edge often returns a valid HTTP status and
@@ -91,7 +91,7 @@ def check_reachable(url=REACH_URL, timeout=10, attempts=4):
         if code and code != "000":
             return True, f"HTTP {code} (curl; urllib reset)"
         last = f"curl http_code={code or 'none'}"
-    except Exception as e:  # noqa: BLE001
+    except (OSError, subprocess.SubprocessError) as e:
         last = f"{last}; curl: {type(e).__name__}: {e}"
 
     return False, f"{attempts} attempts failed (last: {last})"
@@ -184,7 +184,7 @@ def select_linux_os(page):
                     "  if(typeof onSelectVersion==='function') onSelectVersion(v); }")
             print(f"    [select_linux_os] picked version {first_ver.strip()}",
                   file=sys.stderr)
-    except Exception as e:  # noqa: BLE001
+    except PWError as e:
         print(f"    [select_linux_os] version pick skipped: {e}", file=sys.stderr)
 
     # Poll up to ~12s for swos options to populate (JS / AJAX is async).
@@ -215,7 +215,7 @@ def select_linux_os(page):
                   f"{html}", file=sys.stderr)
             print(f"    [select_linux_os] swos parent:\n      {parent}",
                   file=sys.stderr)
-        except Exception as e:  # noqa: BLE001
+        except PWError as e:
             print(f"    [select_linux_os] diag failed: {e}", file=sys.stderr)
         return False
 
@@ -263,7 +263,7 @@ def dump_page(page, label):
                     cls: (e.getAttribute('class')||'').slice(0,40),
                 }))""",
         )
-    except Exception as e:  # noqa: BLE001
+    except PWError as e:
         print(f"    (could not enumerate elements: {e})", file=sys.stderr)
         rows = []
 
@@ -352,7 +352,7 @@ def main() -> int:
         except PWError:
             try:
                 browser = p.chromium.launch(headless=not args.headed)
-            except Exception as e:  # noqa: BLE001
+            except (PWError, OSError) as e:
                 sys.exit("error: could not launch a browser. Install Google "
                          "Chrome, or run 'playwright install chromium'.\n"
                          f"       ({type(e).__name__}: {e})")
@@ -374,7 +374,7 @@ def main() -> int:
             # give the page a moment to render, but don't hang on full load
             with contextlib.suppress(PWError):
                 page.wait_for_load_state("domcontentloaded", timeout=15000)
-        except Exception as e:  # noqa: BLE001
+        except PWError as e:
             print(f"error: could not load {CUBEIDE_URL}\n"
                   f"       ({type(e).__name__}: {str(e).splitlines()[0]})\n"
                   "       check your network / that st.com is reachable.",
@@ -506,7 +506,7 @@ def main() -> int:
                   "can be fixed:", file=sys.stderr)
             dump_page(page, "interrupted on")
             return 130
-        except Exception as e:  # noqa: BLE001
+        except (PWError, OSError, RuntimeError, ValueError, subprocess.SubprocessError) as e:
             print(f"error: unexpected failure ({type(e).__name__}: "
                   f"{str(e).splitlines()[0]}); dumping the current page:",
                   file=sys.stderr)

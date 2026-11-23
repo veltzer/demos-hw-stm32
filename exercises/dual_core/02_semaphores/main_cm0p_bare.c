@@ -6,9 +6,9 @@
 // shared: the M4 brings it up, the M0+ just transmits on it -- which is exactly
 // why a lock is needed so the two cores' lines don't interleave.
 
-void delay(volatile uint32_t count) { while (count--); }
+static void delay(volatile uint32_t count) { while (count--); }
 
-void LPUART1_SendString(const char* str) {
+static void LPUART1_SendString(const char* str) {
     for (size_t i = 0; i < strlen(str); i++) {
         while (!(LPUART1->ISR & USART_ISR_TXE_TXFNF));
         LPUART1->TDR = str[i];
@@ -16,14 +16,14 @@ void LPUART1_SendString(const char* str) {
 }
 
 // --- IPCC channel 2 used as a binary semaphore, from the CPU2 side ---
-void acquire_lock(void) {
+static void acquire_lock(void) {
     // Spin until channel 2 is free (the CPU2->CPU1 occupied flag is clear),
     // then take it by setting the status from the CPU2 side.
     while (IPCC->C2TOC1SR & IPCC_C2TOC1SR_CH2F);
     IPCC->C2SCR = IPCC_C2SCR_CH2S;
 }
 
-void release_lock(void) {
+static void release_lock(void) {
     IPCC->C2SCR = IPCC_C2SCR_CH2C;
 }
 

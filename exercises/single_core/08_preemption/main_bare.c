@@ -3,8 +3,11 @@
 // This is highly simplified for conceptual understanding.
 // A real implementation requires significant assembly code for context switching.
 
-void task1_function(void) { while(1) { /* Blink LED 1 */ } }
-void task2_function(void) { while(1) { /* Blink LED 2 */ } }
+static void task1_function(void) { while(1) { /* Blink LED 1 */ } }
+static void task2_function(void) { while(1) { /* Blink LED 2 */ } }
+
+// the table the scheduler would pick the next task from
+void (*const tasks[])(void) = { task1_function, task2_function };
 
 // SysTick interrupt triggers the scheduler
 void SysTick_Handler(void) {

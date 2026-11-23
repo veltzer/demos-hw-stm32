@@ -1,7 +1,7 @@
 #include "stm32wl55xx.h"
 #include <string.h>
 
-void delay(volatile uint32_t count) { while (count--); }
+static void delay(volatile uint32_t count) { while (count--); }
 
 int main(void) {
     // M4 specific initializations...

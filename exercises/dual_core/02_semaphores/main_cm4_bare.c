@@ -9,10 +9,10 @@
 // (This is a teaching simplification -- a real mutex over IPCC also has to
 //  cope with the other core racing on the same flag; HSEM is the proper tool.)
 
-void delay(volatile uint32_t count) { while (count--); }
+static void delay(volatile uint32_t count) { while (count--); }
 
 // --- minimal LPUART1 bring-up (PA2 TX @ 9600, routed to the ST-LINK VCP) ---
-void LPUART1_Init(void) {
+static void LPUART1_Init(void) {
     RCC->AHB2ENR  |= RCC_AHB2ENR_GPIOAEN;
     RCC->APB1ENR2 |= RCC_APB1ENR2_LPUART1EN;
 
@@ -25,7 +25,7 @@ void LPUART1_Init(void) {
     LPUART1->CR1 |= USART_CR1_TE | USART_CR1_UE;
 }
 
-void LPUART1_SendString(const char* str) {
+static void LPUART1_SendString(const char* str) {
     for (size_t i = 0; i < strlen(str); i++) {
         // No TX FIFO enabled -> poll TXE_TXFNF, not TXFE.
         while (!(LPUART1->ISR & USART_ISR_TXE_TXFNF));
@@ -34,14 +34,14 @@ void LPUART1_SendString(const char* str) {
 }
 
 // --- IPCC channel 2 used as a binary semaphore, from the CPU1 side ---
-void acquire_lock(void) {
+static void acquire_lock(void) {
     // Spin until channel 2 is free (the CPU1->CPU2 occupied flag is clear),
     // then take it by setting the status.
     while (IPCC->C1TOC2SR & IPCC_C1TOC2SR_CH2F);
     IPCC->C1SCR = IPCC_C1SCR_CH2S;
 }
 
-void release_lock(void) {
+static void release_lock(void) {
     // Clear the channel from the CPU1 side -> resource free again.
     IPCC->C1SCR = IPCC_C1SCR_CH2C;
 }
