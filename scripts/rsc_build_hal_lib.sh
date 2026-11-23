@@ -91,6 +91,7 @@ compiled=0
 for src in "${HAL_DRV}/Src"/*.c; do
 	case "${src}" in
 	*_template.c) continue ;;
+	*) ;; # every other source is compiled
 	esac
 	obj="${objdir}/$(basename "${src%.c}").o"
 	if [ "${obj}" -nt "${src}" ] && [ "${obj}" -nt "$0" ]; then

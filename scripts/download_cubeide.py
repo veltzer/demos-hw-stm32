@@ -16,6 +16,7 @@ Usage:
 Exit codes: 0 ok, 2 bad/missing credentials, 3 download/flow failure.
 """
 import argparse
+import contextlib
 import os
 import re
 import subprocess
@@ -23,6 +24,14 @@ import sys
 import urllib.error
 import urllib.request
 from pathlib import Path
+
+try:
+    from playwright.sync_api import Error as PWError
+    from playwright.sync_api import TimeoutError as PWTimeout
+    from playwright.sync_api import sync_playwright
+except ImportError:
+    sys.exit("error: playwright not installed. Run 'uv sync' in the repo "
+             "and use its .venv, then 'playwright install chromium'.")
 
 # This script drives a third-party site whose markup changes without notice,
 # so every step is best-effort: broad `except Exception` around each probe is
@@ -136,7 +145,7 @@ def click_if_present(page, selectors, timeout=2500):
             loc.wait_for(state="visible", timeout=per)
             loc.click()
             return True
-        except Exception:  # noqa: BLE001,S112
+        except PWError:
             continue
     return False
 
@@ -149,7 +158,7 @@ def select_linux_os(page):
     sel = page.locator("select.swos, #swos_0").first
     try:
         sel.wait_for(state="attached", timeout=8000)
-    except Exception:  # noqa: BLE001
+    except PWError:
         print("    [select_linux_os] no swos OS dropdown found", file=sys.stderr)
         return False
 
@@ -166,15 +175,13 @@ def select_linux_os(page):
             # select_option by label AND trigger the site handler explicitly in
             # case it binds via jQuery .change() rather than addEventListener.
             ver.select_option(label=first_ver.strip())
-            try:
+            with contextlib.suppress(PWError):
                 page.evaluate(
                     "() => { const v=document.querySelector('#swversion_0');"
                     "  if(!v) return;"
                     "  v.dispatchEvent(new Event('change',{bubbles:true}));"
                     "  if(window.jQuery) jQuery(v).trigger('change');"
                     "  if(typeof onSelectVersion==='function') onSelectVersion(v); }")
-            except Exception:  # noqa: BLE001,S110
-                pass
             print(f"    [select_linux_os] picked version {first_ver.strip()}",
                   file=sys.stderr)
     except Exception as e:  # noqa: BLE001
@@ -185,7 +192,7 @@ def select_linux_os(page):
     for _ in range(24):
         try:
             opts = sel.locator("option").all_inner_texts()
-        except Exception:  # noqa: BLE001
+        except PWError:
             opts = []
         if any("linux" in (o or "").lower() for o in opts):
             break
@@ -214,22 +221,20 @@ def select_linux_os(page):
 
     try:
         sel.select_option(label=linux_label.strip())
-    except Exception:  # noqa: BLE001
+    except PWError:
         try:
             sel.select_option(value=linux_label.strip())
-        except Exception:  # noqa: BLE001
+        except PWError:
             return False
 
     # Fire the site's own handler (the select has onchange="onSelectOs(this)")
     # so it reveals the Get-latest button for the Linux row.
-    try:
+    with contextlib.suppress(PWError):
         page.evaluate(
             "() => { const el=document.querySelector('#swos_0'); if(!el) return;"
             "  el.dispatchEvent(new Event('change',{bubbles:true}));"
             "  if(window.jQuery) jQuery(el).trigger('change');"
             "  if(typeof onSelectOs==='function') onSelectOs(el); }")
-    except Exception:  # noqa: BLE001,S110
-        pass
     page.wait_for_timeout(1500)
     print(f"    [select_linux_os] selected: {linux_label.strip()}", file=sys.stderr)
     return True
@@ -244,7 +249,7 @@ def dump_page(page, label):
     try:
         page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
         page.wait_for_timeout(1500)
-    except Exception:  # noqa: BLE001,S110
+    except PWError:
         pass
     try:
         rows = page.eval_on_selector_all(
@@ -294,7 +299,7 @@ def dump_page(page, label):
         shot = "/tmp/cubeide_page.png"
         page.screenshot(path=shot, full_page=True)
         print(f"--- saved full-page screenshot to {shot}", file=sys.stderr)
-    except Exception:  # noqa: BLE001,S110
+    except PWError:
         pass
 
 
@@ -337,13 +342,6 @@ def main() -> int:
             return 3
         print(f"    st.com reachable ({detail})")
 
-    try:
-        from playwright.sync_api import TimeoutError as PWTimeout
-        from playwright.sync_api import sync_playwright
-    except ImportError:
-        sys.exit("error: playwright not installed. Run 'uv sync' in the repo "
-                 "and use its .venv, then 'playwright install chromium'.")
-
     nav_ms = args.timeout * 1000
     with sync_playwright() as p:
         # Prefer the system Google Chrome (channel="chrome"): Playwright's own
@@ -351,7 +349,7 @@ def main() -> int:
         # system chrome works fine. Fall back to bundled chromium if no channel.
         try:
             browser = p.chromium.launch(channel="chrome", headless=not args.headed)
-        except Exception:  # noqa: BLE001
+        except PWError:
             try:
                 browser = p.chromium.launch(headless=not args.headed)
             except Exception as e:  # noqa: BLE001
@@ -374,10 +372,8 @@ def main() -> int:
         try:
             page.goto(CUBEIDE_URL, wait_until="commit", timeout=45000)
             # give the page a moment to render, but don't hang on full load
-            try:
+            with contextlib.suppress(PWError):
                 page.wait_for_load_state("domcontentloaded", timeout=15000)
-            except Exception:  # noqa: BLE001,S110
-                pass
         except Exception as e:  # noqa: BLE001
             print(f"error: could not load {CUBEIDE_URL}\n"
                   f"       ({type(e).__name__}: {str(e).splitlines()[0]})\n"
@@ -403,7 +399,7 @@ def main() -> int:
                 try:
                     page.goto(CUBEIDE_URL, wait_until="commit", timeout=45000)
                     page.wait_for_load_state("domcontentloaded", timeout=15000)
-                except Exception:  # noqa: BLE001,S110
+                except PWError:
                     pass
 
             # 2a) Reveal the "Get Software" table. Use the language-independent
@@ -416,7 +412,7 @@ def main() -> int:
             try:
                 page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
                 page.wait_for_timeout(1200)
-            except Exception:  # noqa: BLE001,S110
+            except PWError:
                 pass
 
             # 2b) The "Get latest" button is hidden until an OS is chosen in the
@@ -474,7 +470,7 @@ def main() -> int:
                         "button[type='submit']",
                     ])
                     page.wait_for_timeout(1500)
-            except Exception:  # noqa: BLE001,S110
+            except PWError:
                 # No login dialog -> already authenticated; proceed.
                 pass
 
@@ -499,10 +495,8 @@ def main() -> int:
             suggested = download.suggested_filename or "stm32cubeide-linux-installer.sh"
             target = dest / suggested
             download.save_as(str(target))
-            try:
+            with contextlib.suppress(OSError):
                 os.chmod(target, 0o755)
-            except OSError:
-                pass
             print(f"==> downloaded: {target}")
             print("    run it yourself to install (needs sudo; installs under "
                   "/opt/st/):")

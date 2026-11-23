@@ -57,6 +57,7 @@ for arg in "$@"; do
 		if [ "${section}" = inputs ]; then
 			case "$(basename "${arg}")" in
 			main*.c) mains+=("${arg}") ;;
+			*) ;; # only main*.c are entry points
 			esac
 		fi
 		;;
