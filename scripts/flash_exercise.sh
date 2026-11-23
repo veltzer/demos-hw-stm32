@@ -13,17 +13,17 @@ source "${HERE}/scripts/cubeide.sh"
 list_exercises() {
 	echo "single-core exercises:" >&2
 	for dir in "${HERE}"/exercises/single_core/[0-9]*_*/; do
-		[ -f "${dir}/main_bare.c" ] || continue
+		[[ -f "${dir}/main_bare.c" ]] || continue
 		echo "  $(basename "${dir}")" >&2
 	done
 	echo "dual-core exercises:" >&2
 	for dir in "${HERE}"/exercises/dual_core/[0-9]*_*/; do
-		[ -f "${dir}/main_cm4_bare.c" ] || continue
+		[[ -f "${dir}/main_cm4_bare.c" ]] || continue
 		echo "  $(basename "${dir}")" >&2
 	done
 }
 
-if [ "$#" -lt 1 ]; then
+if [[ "$#" -lt 1 ]]; then
 	echo "usage: $0 <exercise> [bare|hal]" >&2
 	list_exercises
 	exit 1
@@ -39,7 +39,7 @@ case "${VARIANT}" in
 esac
 # Helper: a built file must exist (this script only flashes, never builds).
 need() {
-	[ -f "$1" ] && return 0
+	[[ -f "$1" ]] && return 0
 	echo "error: $1 not found -- build it first:  make ${EX}" >&2
 	exit 1
 }
@@ -49,12 +49,12 @@ need() {
 # --connect-under-reset is a no-op and the flash fails. The CLI's mode=UR
 # (connect under reset) works -- the running firmware can otherwise hold the SWD
 # lines. ELFs carry their own load addresses, so no explicit address is needed.
-if [ -d "${HERE}/exercises/single_core/${EX}" ]; then
+if [[ -d "${HERE}/exercises/single_core/${EX}" ]]; then
 	ELF="${HERE}/exercises/single_core/${EX}/app_${VARIANT}.elf"
 	need "${ELF}"
 	echo "flashing single-core ${EX} (${VARIANT}) and starting it"
 	"${CLI}" -c port=SWD mode=UR -d "${ELF}" --start
-elif [ -d "${HERE}/exercises/dual_core/${EX}" ]; then
+elif [[ -d "${HERE}/exercises/dual_core/${EX}" ]]; then
 	# Dual-core: program BOTH images. Each ELF lands in its own flash bank
 	# (M4 -> bank 1 @ 0x08000000, M0+ -> bank 2 @ 0x08020000, per the linker
 	# scripts). The M4 firmware sets PWR.C2BOOT to start the M0+; SBRV already

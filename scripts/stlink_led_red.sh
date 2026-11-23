@@ -10,7 +10,7 @@
 ST_VID="0483"
 STLINK_V3_PID="374e"
 
-if ! lsusb | grep -qi "${ST_VID}:${STLINK_V3_PID}"; then
+if ! { lsusb || true; } | grep -qi "${ST_VID}:${STLINK_V3_PID}"; then
 	echo "ST-LINK (${ST_VID}:${STLINK_V3_PID}) not found on USB." >&2
 	exit 1
 fi

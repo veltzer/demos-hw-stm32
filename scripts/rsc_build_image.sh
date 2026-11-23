@@ -32,8 +32,8 @@ OBJCOPY=arm-none-eabi-objcopy
 # and takes an flock, so the parallel image builds cannot race here. Only
 # the default location is auto-fetched: an explicit CUBEWL points at a tree
 # the caller manages, so a missing one stays an error.
-if [ ! -f "${HAL_DRV}/Src/stm32wlxx_hal_ipcc.c" ]; then
-	if [ -n "${CUBEWL_EXPLICIT:-}" ]; then
+if [[ ! -f "${HAL_DRV}/Src/stm32wlxx_hal_ipcc.c" ]]; then
+	if [[ -n "${CUBEWL_EXPLICIT:-}" ]]; then
 		echo "STM32CubeWL not found at '${CUBEWL}'. No exercises can build." >&2
 		echo "Set CUBEWL to a valid STM32CubeWL tree, or unset it to auto-fetch." >&2
 		exit 1
@@ -54,7 +54,7 @@ for arg in "$@"; do
 	--inputs) section=inputs ;;
 	--output-files | --output-dirs) section=outputs ;;
 	*)
-		if [ "${section}" = inputs ]; then
+		if [[ "${section}" = inputs ]]; then
 			case "$(basename "${arg}")" in
 			main*.c) mains+=("${arg}") ;;
 			*) ;; # only main*.c are entry points
@@ -64,7 +64,7 @@ for arg in "$@"; do
 	esac
 done
 
-if [ "${#mains[@]}" -eq 0 ]; then
+if [[ "${#mains[@]}" -eq 0 ]]; then
 	echo "$0: no main*.c files among --inputs" >&2
 	exit 1
 fi
@@ -93,7 +93,7 @@ for main in "${mains[@]}"; do
 	# Per-exercise linker script override, else the common default (the
 	# Makefile's ld-m4 / ld-cm0 helpers).
 	ld="${dir}/${ld_name}"
-	if [ ! -f "${ld}" ]; then
+	if [[ ! -f "${ld}" ]]; then
 		ld="${COMMON}/${ld_name}"
 	fi
 
@@ -112,17 +112,21 @@ for main in "${mains[@]}"; do
 
 	echo "  IMG   ${elf}"
 	# The filter drops known linker noise; gcc's own status, not grep's (which
-	# is 1 when every line was noise), decides whether the build failed.
+	# is 1 when every line was noise), decides whether the build failed. The
+	# output is captured first so gcc's status is not masked by the pipe.
 	set +e
-	"${CC}" "${cpu[@]}" "${defs[@]}" "${includes[@]}" \
+	cc_output="$("${CC}" "${cpu[@]}" "${defs[@]}" "${includes[@]}" \
 		-Wall -Wextra -O2 -g3 -ffunction-sections -fdata-sections \
 		-Wl,--gc-sections --specs=nano.specs --specs=nosys.specs \
 		-T"${ld}" -Wl,-Map="${map}" \
 		-o "${elf}" "${main}" "${COMMON}/system_stm32wlxx.c" "${startup}" \
-		"${libs[@]}" 2>&1 | grep -vE "${LD_NOISE}"
-	cc_status="${PIPESTATUS[0]}"
+		"${libs[@]}" 2>&1)"
+	cc_status=$?
 	set -e
-	if [ "${cc_status}" -ne 0 ] || [ ! -f "${elf}" ]; then
+	if [[ -n "${cc_output}" ]]; then
+		grep -vE "${LD_NOISE}" <<<"${cc_output}" || true
+	fi
+	if [[ "${cc_status}" -ne 0 ]] || [[ ! -f "${elf}" ]]; then
 		echo "$0: build failed for ${main}" >&2
 		exit 1
 	fi

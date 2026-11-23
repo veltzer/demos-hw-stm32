@@ -3,7 +3,7 @@
 #
 # Sourced, not executed: it edits the current shell's PATH. Do not add `set -e`.
 
-if [ -n "${_ST_AUTO_PATH_DIR:-}" ]; then
+if [[ -n "${_ST_AUTO_PATH_DIR:-}" ]]; then
 	# Strip every occurrence of the dir we added from PATH.
 	_new_path=":${PATH}:"
 	_new_path="${_new_path//:${_ST_AUTO_PATH_DIR}:/:}"

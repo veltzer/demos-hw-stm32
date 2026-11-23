@@ -26,7 +26,7 @@ info()  { printf '\033[36m%s\033[0m\n' "$*"; }
 # ---------------------------------------------------------------------------
 info "== Level 1: USB enumeration (lsusb) =="
 usb_line=$(lsusb | grep -i "${ST_VID}:" || true)
-if [ -z "${usb_line}" ]; then
+if [[ -z "${usb_line}" ]]; then
 	red "FAIL: no STMicroelectronics (VID ${ST_VID}) device found on USB."
 	red "      The board is not plugged in, the cable is power-only, or the probe is dead."
 	exit 1
@@ -63,7 +63,7 @@ if command -v st-info >/dev/null 2>&1; then
 		exit 1
 	fi
 	green "OK: ST-LINK can read the target MCU."
-elif [ -x "${CLI}" ]; then
+elif [[ -x "${CLI}" ]]; then
 	# Fall back to ST's official programmer CLI (already installed with CubeIDE).
 	info "st-info not installed; using STM32_Programmer_CLI instead."
 	# mode=UR (connect under reset): running firmware can hold the SWD lines so a

@@ -9,7 +9,7 @@
 # shellcheck source=scripts/cubeide.sh disable=SC1091
 source "$(dirname "$0")/cubeide.sh"
 
-if [ "$#" -lt 1 ]; then
+if [[ "$#" -lt 1 ]]; then
 	echo "usage: $0 <file.elf|file.bin>"
 	exit 1
 fi

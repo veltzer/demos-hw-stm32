@@ -9,7 +9,7 @@
 source "$(dirname "${BASH_SOURCE[0]}")/scripts/cubeide.sh"
 
 # The CLI lives in the cubeprogrammer plugin's tools/bin; CLI is its full path.
-if [ -n "${CLI:-}" ] && [ -x "${CLI}" ]; then
+if [[ -n "${CLI:-}" ]] && [[ -x "${CLI}" ]]; then
 	ST_BIN_DIR="$(dirname "${CLI}")"
 	# Prepend only if not already present.
 	case ":${PATH}:" in

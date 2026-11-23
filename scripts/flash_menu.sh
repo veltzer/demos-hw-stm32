@@ -23,15 +23,15 @@ fi
 # Dual-core entries flash both cores (handled by flash_exercise.sh).
 items=()        # tag + description pairs for the menu
 for dir in "${SINGLEDIR}"/[0-9]*_*/; do
-	[ -f "${dir}/main_bare.c" ] || continue
+	[[ -f "${dir}/main_bare.c" ]] || continue
 	items+=("$(basename "${dir}")" "single-core")
 done
 for dir in "${DUALDIR}"/[0-9]*_*/; do
-	[ -f "${dir}/main_cm4_bare.c" ] || continue
+	[[ -f "${dir}/main_cm4_bare.c" ]] || continue
 	items+=("$(basename "${dir}")" "dual-core")
 done
 
-if [ "${#items[@]}" -eq 0 ]; then
+if [[ "${#items[@]}" -eq 0 ]]; then
 	echo "error: no exercises found under ${SINGLEDIR} or ${DUALDIR}" >&2
 	exit 1
 fi
@@ -44,7 +44,7 @@ choice="$("${MENU}" --title "Flash an exercise" \
 	"${items[@]}" \
 	3>&1 1>&2 2>&3)" || { echo "cancelled."; exit 0; }
 
-[ -n "${choice}" ] || { echo "cancelled."; exit 0; }
+[[ -n "${choice}" ]] || { echo "cancelled."; exit 0; }
 
 # Second menu: bare-metal vs HAL solution for the chosen exercise.
 variant="$("${MENU}" --title "Which solution?" \
@@ -54,7 +54,7 @@ variant="$("${MENU}" --title "Which solution?" \
 	hal  "using the STM32 HAL" \
 	3>&1 1>&2 2>&3)" || { echo "cancelled."; exit 0; }
 
-[ -n "${variant}" ] || { echo "cancelled."; exit 0; }
+[[ -n "${variant}" ]] || { echo "cancelled."; exit 0; }
 
 echo "==> flashing ${choice} (${variant})"
 exec "${HERE}/scripts/flash_exercise.sh" "${choice}" "${variant}"

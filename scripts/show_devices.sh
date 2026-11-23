@@ -8,7 +8,7 @@ STLINK_V3_PID="374e"
 
 echo "== 1. USB device node (debug / SWD) =="
 line=$(lsusb | grep -i "${ST_VID}:${STLINK_V3_PID}" || true)
-if [ -z "${line}" ]; then
+if [[ -z "${line}" ]]; then
 	echo "  ST-LINK (${ST_VID}:${STLINK_V3_PID}) not found on USB."
 else
 	bus=$(echo "${line}" | sed -E 's/^Bus ([0-9]+) Device ([0-9]+):.*/\1/')
@@ -20,11 +20,11 @@ echo
 echo "== 2. Serial VCP (UART console) =="
 found=""
 for s in /dev/serial/by-id/*STLINK*; do
-	[ -e "${s}" ] || continue
+	[[ -e "${s}" ]] || continue
 	found="yes"
 	# resolve the symlink to the real ttyACMx and show that node's permissions
 	real=$(readlink -f "${s}")
 	ls -l "${s}"
 	ls -l "${real}"
 done
-[ -n "${found}" ] || echo "  no ST-LINK serial port found (no /dev/serial/by-id/*STLINK*)."
+[[ -n "${found}" ]] || echo "  no ST-LINK serial port found (no /dev/serial/by-id/*STLINK*)."

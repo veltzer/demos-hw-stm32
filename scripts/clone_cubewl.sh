@@ -20,7 +20,7 @@ REPO="https://github.com/STMicroelectronics/STM32CubeWL.git"
 MARKER="${DEST}/Drivers/STM32WLxx_HAL_Driver/Src/stm32wlxx_hal_ipcc.c"
 
 # Fast path: a ready tree needs no lock at all.
-if [ -f "${MARKER}" ]; then
+if [[ -f "${MARKER}" ]]; then
 	echo "STM32CubeWL already present at ${DEST}"
 	exit 0
 fi
@@ -33,7 +33,7 @@ exec 9>"${HERE}/out/.cubewl.lock"
 flock 9
 
 # Re-check under the lock: another caller may have finished while we waited.
-if [ -f "${MARKER}" ]; then
+if [[ -f "${MARKER}" ]]; then
 	echo "STM32CubeWL already present at ${DEST}"
 	exit 0
 fi
@@ -44,7 +44,7 @@ SUBMODULES=(
 	"Drivers/CMSIS"
 )
 
-if [ ! -d "${DEST}/.git" ]; then
+if [[ ! -d "${DEST}/.git" ]]; then
 	echo "cloning STM32CubeWL into ${DEST} ..."
 	git clone --depth 1 "${REPO}" "${DEST}"
 else
@@ -55,8 +55,9 @@ echo "fetching required submodules (HAL driver, CMSIS) ..."
 git -C "${DEST}" submodule update --init --depth 1 "${SUBMODULES[@]}"
 
 # Sanity check: the IPCC driver is the marker that the full set is in place.
-if [ -f "${MARKER}" ]; then
-	echo "ok: STM32CubeWL ready ($(find "${DEST}/Drivers/STM32WLxx_HAL_Driver/Src" -maxdepth 1 -name "*.c" | wc -l) HAL sources)"
+if [[ -f "${MARKER}" ]]; then
+	hal_count="$({ find "${DEST}/Drivers/STM32WLxx_HAL_Driver/Src" -maxdepth 1 -name "*.c" || true; } | wc -l)"
+	echo "ok: STM32CubeWL ready (${hal_count} HAL sources)"
 else
 	echo "error: HAL driver sources missing after clone -- submodule fetch failed?" >&2
 	exit 1

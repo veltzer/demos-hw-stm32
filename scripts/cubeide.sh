@@ -22,7 +22,7 @@ _cubeprog_glob=("${CUBEIDE_DIR}"/plugins/com.st.stm32cube.ide.mcu.externaltools.
 CLI="${_cubeprog_glob[0]}"
 
 # The IDE launcher (wayland build; falls back to the plain launcher if present).
-if [ -x "${CUBEIDE_DIR}/stm32cubeide_wayland" ]; then
+if [[ -x "${CUBEIDE_DIR}/stm32cubeide_wayland" ]]; then
 	IDE="${CUBEIDE_DIR}/stm32cubeide_wayland"
 else
 	IDE="${CUBEIDE_DIR}/stm32cubeide"
