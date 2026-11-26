@@ -352,6 +352,10 @@ output_files = [
 	"exercises/dual_core/04_atomic_increment/firmware_cm0p_hal.bin",
 ]
 
+# lint the Lua configuration with luacheck (policy: .luacheckrc)
+[processor.checker.iluacheck]
+src_dirs = ["config"]
+
 # lint the YAML files with yamllint (policy: .yamllint.yaml)
 [processor.checker.iyamllint]
 src_dirs = [".github"]
