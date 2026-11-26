@@ -352,6 +352,11 @@ output_files = [
 	"exercises/dual_core/04_atomic_increment/firmware_cm0p_hal.bin",
 ]
 
+# lint the YAML files with yamllint (policy: .yamllint.yaml)
+[processor.checker.iyamllint]
+src_dirs = [".github"]
+src_files = [".yamllint.yaml"]
+
 # lint the GitHub Actions workflow files with actionlint
 [processor.checker.iactionlint]
 src_dirs = [".github/workflows"]
