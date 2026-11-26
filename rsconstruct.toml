@@ -43,7 +43,7 @@ external_sources = true
 # ─── toml / yaml / json ──────────────────────────────────────────────────────
 
 [processor.checker.taplo]
-src_files = [".rumdl.toml", "pyproject.toml", "rsconstruct.toml"]
+src_files = [".ruff.toml", ".rumdl.toml", "pyproject.toml", "rsconstruct.toml"]
 src_exclude_dirs = "${generated_excludes}"
 
 # ─── repo-specific configuration ────────────────────────────────────────────
