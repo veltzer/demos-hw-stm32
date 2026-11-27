@@ -189,7 +189,7 @@ def select_linux_os(page):
         print(f"    [select_linux_os] version pick skipped: {e}", file=sys.stderr)
 
     # Poll up to ~12s for swos options to populate (JS / AJAX is async).
-    opts = []
+    opts: list[str] = []
     for _ in range(24):
         try:
             opts = sel.locator("option").all_inner_texts()
@@ -253,7 +253,7 @@ def dump_page(page, label):
     except PWError:
         pass
     try:
-        rows = page.eval_on_selector_all(
+        rows: list[dict[str, str]] = page.eval_on_selector_all(
             "a, button, input[type=submit], input[type=button], [role=button], "
             "select, [class*=dropdown], [class*=select]",
             r"""els => els.map(e => ({
