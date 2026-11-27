@@ -20,18 +20,18 @@ A block of `#define HAL_<MODULE>_MODULE_ENABLED` lines. A module that is *not*
 defined here compiles to nothing (and its header is not included), which keeps
 unused drivers out of the build. The modules enabled for these exercises are:
 
-| Module    | Why it's on                                             |
-| --------- | ------------------------------------------------------- |
-| `GPIO`    | every exercise drives LEDs / reads buttons              |
-| `RCC`     | clock + peripheral-clock enables (always needed)        |
-| `CORTEX`  | `HAL_Init`, SysTick, NVIC priority helpers              |
-| `PWR`     | low-power + the M0+ boot path (dual-core)               |
-| `FLASH`   | a HAL dependency pulled in by the core                  |
-| `DMA`     | a HAL dependency of several drivers                     |
-| `UART`    | the serial-counter / buttons-test exercises             |
-| `EXTI`    | the interrupt (button EXTI) exercise                    |
-| `IPCC`    | inter-core mailbox (dual-core exercises)                |
-| `HSEM`    | hardware semaphore (dual-core exercises)                |
+| Module   | Why it's on                                      |
+| -------- | ------------------------------------------------ |
+| `GPIO`   | every exercise drives LEDs / reads buttons       |
+| `RCC`    | clock + peripheral-clock enables (always needed) |
+| `CORTEX` | `HAL_Init`, SysTick, NVIC priority helpers       |
+| `PWR`    | low-power + the M0+ boot path (dual-core)        |
+| `FLASH`  | a HAL dependency pulled in by the core           |
+| `DMA`    | a HAL dependency of several drivers              |
+| `UART`   | the serial-counter / buttons-test exercises      |
+| `EXTI`   | the interrupt (button EXTI) exercise             |
+| `IPCC`   | inter-core mailbox (dual-core exercises)         |
+| `HSEM`   | hardware semaphore (dual-core exercises)         |
 
 `IPCC` and `HSEM` were enabled by us specifically for the dual-core work — the
 CubeIDE blink project this was originally derived from left them off.

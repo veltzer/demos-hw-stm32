@@ -7,18 +7,18 @@ Guidance for working in this repo (STM32WL55 NUCLEO board demos & exercises).
 All apt-installable tools the repo uses are in `scripts/install_deps.sh`. The
 command-to-package mapping (keep this in sync if scripts gain new tools):
 
-| Command(s)                              | apt package              |
-| --------------------------------------- | ------------------------ |
-| `lsusb`, `usbreset`                     | `usbutils`               |
-| `st-flash`, `st-info`                   | `stlink-tools`           |
-| `minicom`                               | `minicom`                |
-| `tio`                                   | `tio`                    |
-| `make`                                  | `make`                   |
-| `g++` (host build of `examples/*.cc`)   | `g++`                    |
-| `whiptail`                              | `whiptail`               |
-| `dialog`                                | `dialog`                 |
-| `pass`                                  | `pass`                   |
-| `arm-none-eabi-gcc` / `objcopy` / `size`| `gcc-arm-none-eabi`, `binutils-arm-none-eabi`, `libnewlib-arm-none-eabi` |
+| Command(s)                               | apt package                                                              |
+| ---------------------------------------- | ------------------------------------------------------------------------ |
+| `lsusb`, `usbreset`                      | `usbutils`                                                               |
+| `st-flash`, `st-info`                    | `stlink-tools`                                                           |
+| `minicom`                                | `minicom`                                                                |
+| `tio`                                    | `tio`                                                                    |
+| `make`                                   | `make`                                                                   |
+| `g++` (host build of `examples/*.cc`)    | `g++`                                                                    |
+| `whiptail`                               | `whiptail`                                                               |
+| `dialog`                                 | `dialog`                                                                 |
+| `pass`                                   | `pass`                                                                   |
+| `arm-none-eabi-gcc` / `objcopy` / `size` | `gcc-arm-none-eabi`, `binutils-arm-none-eabi`, `libnewlib-arm-none-eabi` |
 
 `STM32_Programmer_CLI` (used by `mass_erase.sh`, `reset.sh`, `check*.sh`, `run.sh`,
 `remove_protection.sh`, `show_devices.sh`) is **not** an apt package - it ships

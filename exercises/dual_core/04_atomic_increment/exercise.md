@@ -100,14 +100,14 @@ its address is fixed and never overlaps anything else. The M4 has no symbol for
 it -- it reaches the same fields through a `volatile shared_t*` at the absolute
 address `0x20008000`. The struct holds:
 
-| field            | written by | meaning                                  |
-| ---------------- | ---------- | ---------------------------------------- |
-| `counter`        | both cores | the contended integer                    |
-| `mode`           | M4         | `0` = RACY, `1` = ATOMIC                  |
-| `m4_done`        | M4         | M4 finished its N increments this round  |
-| `m0p_done`       | M0+        | M0+ finished its N increments this round |
-| `round`          | M4         | round number, bumped to start each round |
-| `m0p_ready`      | M0+        | M0+ has booted and sampled round 0       |
+| field       | written by | meaning                                  |
+| ----------- | ---------- | ---------------------------------------- |
+| `counter`   | both cores | the contended integer                    |
+| `mode`      | M4         | `0` = RACY, `1` = ATOMIC                 |
+| `m4_done`   | M4         | M4 finished its N increments this round  |
+| `m0p_done`  | M0+        | M0+ finished its N increments this round |
+| `round`     | M4         | round number, bumped to start each round |
+| `m0p_ready` | M0+        | M0+ has booted and sampled round 0       |
 
 The `m0p_ready` flag closes a **boot race**: the M4 must not bump `round` until
 the M0+ has booted (via C2BOOT, which takes time) and sampled `round` while it

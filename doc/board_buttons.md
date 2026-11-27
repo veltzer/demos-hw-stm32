@@ -27,12 +27,12 @@ Hold the board so the **USB connector (CN1, to the ST-LINK) points away from you
 
 ## Buttons
 
-| Silkscreen | Role        | GPIO                                   |
-| ---------- | ----------- | -------------------------------------- |
-| **B1**     | USER button | **PA0** (default) — or **PC13** \*     |
-| **B2**     | USER button | PA1                                    |
-| **B3**     | USER button | PC6                                    |
-| **B4**     | RESET       | NRST (resets the chip; not a GPIO in)  |
+| Silkscreen | Role        | GPIO                                  |
+| ---------- | ----------- | ------------------------------------- |
+| **B1**     | USER button | **PA0** (default) — or **PC13** \*    |
+| **B2**     | USER button | PA1                                   |
+| **B3**     | USER button | PC6                                   |
+| **B4**     | RESET       | NRST (resets the chip; not a GPIO in) |
 
 \* B1 can be wired to **PA0** (factory default, SB16 ON / SB15 OFF) or **PC13**
 (SB15 ON / SB16 OFF). On *this* board B1 is **PA0** — confirmed with
@@ -43,11 +43,11 @@ goes LOW while the button is held.
 
 ## LEDs
 
-| Silkscreen | Color | GPIO  | Active level |
-| ---------- | ----- | ----- | ------------ |
-| **LD1**    | blue  | PB15  | high = on    |
-| **LD2**    | green | PB9   | high = on    |
-| **LD3**    | red   | PB11  | high = on    |
+| Silkscreen | Color | GPIO | Active level |
+| ---------- | ----- | ---- | ------------ |
+| **LD1**    | blue  | PB15 | high = on    |
+| **LD2**    | green | PB9  | high = on    |
+| **LD3**    | red   | PB11 | high = on    |
 
 (LD5 near the ST-LINK is the debugger's own status LED, not user-controllable.)
 
@@ -84,11 +84,11 @@ With a good cable, `02_buttons_test` printed, on press/release:
 
 So on this board:
 
-| Button | Pin  | Active level                         |
-| ------ | ---- | ------------------------------------ |
-| B1     | PA0  | active-LOW (idle high, press = low)  |
-| B2     | PA1  | active-LOW                           |
-| B3     | PC6  | active-LOW                           |
+| Button | Pin | Active level                        |
+| ------ | --- | ----------------------------------- |
+| B1     | PA0 | active-LOW (idle high, press = low) |
+| B2     | PA1 | active-LOW                          |
+| B3     | PC6 | active-LOW                          |
 
 B1 is **PA0** (the factory SB16/SB15 default), not PC13. All three are
 active-low: enable an internal **pull-up**, and a press reads **LOW** / triggers

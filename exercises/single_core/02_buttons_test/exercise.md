@@ -9,11 +9,11 @@ That mapping is needed by the later button exercises (`04_buttons_and_leds`,
 
 The NUCLEO-WL55JC user buttons (per UM2592) are:
 
-| Button | Pin                                   |
-| ------ | ------------------------------------- |
+| Button | Pin                                       |
+| ------ | ----------------------------------------- |
 | B1     | PA0 (confirmed on this board; active-low) |
-| B2     | PA1                                   |
-| B3     | PC6                                   |
+| B2     | PA1                                       |
+| B3     | PC6                                       |
 
 (B4/RESET is NRST and is not a GPIO input — see `doc/board_buttons.md` for the
 physical layout and which button is which.)
