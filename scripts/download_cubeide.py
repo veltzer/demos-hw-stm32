@@ -144,9 +144,10 @@ def click_if_present(page, selectors, timeout=2500):
             loc = page.locator(sel).locator("visible=true").first
             loc.wait_for(state="visible", timeout=per)
             loc.click()
-            return True
         except PWError:
             continue
+        else:
+            return True
     return False
 
 
