@@ -9,7 +9,8 @@ jmp_buf task2_context;
 jmp_buf main_context;
 
 void task_one() {
-  int counter = 1000;
+  // volatile: the value must survive the longjmp back into this function
+  volatile int counter = 1000;
   // Set a jump point for returning to this task later.
   if (setjmp(task1_context) == 0) {
     // This block runs only the FIRST time setjmp is called.
@@ -19,7 +20,8 @@ void task_one() {
 
   // This is the task's "forever" loop.
   while (1) {
-    printf("Task 1 - Execution #%d\n", ++counter);
+    counter = counter + 1;
+    printf("Task 1 - Execution #%d\n", counter);
     usleep(500000); // 0.5 second delay
 
     // Save the current context (here in task_one) and jump to task_two.
@@ -37,7 +39,8 @@ void task_one() {
  * back-and-forth execution flow.
  */
 void task_two() {
-  int counter1 = 1000;
+  // volatile: the value must survive the longjmp back into this function
+  volatile int counter1 = 1000;
   // Set a jump point for returning to this task later.
   if (setjmp(task2_context) == 0) {
     // This block runs only the FIRST time setjmp is called.
@@ -47,7 +50,8 @@ void task_two() {
 
   // This is the task's "forever" loop.
   while (1) {
-    printf("Task 2 - Execution #%d\n", ++counter1);
+    counter1 = counter1 + 1;
+    printf("Task 2 - Execution #%d\n", counter1);
     usleep(500000); // 0.5 second delay
 
     // Save the current context (here in task_two) and jump to task_one.

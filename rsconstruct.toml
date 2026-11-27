@@ -58,7 +58,7 @@ generated_excludes = [
 src_dirs = ["examples"]
 src_extensions = [".cc"]
 output_dir = "."
-cxxflags = ["-Wall", "-pedantic", "-O2"]
+cxxflags = ["-Wall", "-Wextra", "-Werror", "-pedantic", "-O2"]
 
 [processor.explicit.generic.hal_lib_cm4]
 command = "scripts/rsc_build_hal_lib.sh"

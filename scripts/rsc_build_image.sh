@@ -116,7 +116,7 @@ for main in "${mains[@]}"; do
 	# output is captured first so gcc's status is not masked by the pipe.
 	set +e
 	cc_output="$("${CC}" "${cpu[@]}" "${defs[@]}" "${includes[@]}" \
-		-Wall -Wextra -pedantic -O2 -g3 -ffunction-sections -fdata-sections \
+		-Wall -Wextra -Werror -pedantic -O2 -g3 -ffunction-sections -fdata-sections \
 		-Wl,--gc-sections --specs=nano.specs --specs=nosys.specs \
 		-T"${ld}" -Wl,-Map="${map}" \
 		-o "${elf}" "${main}" "${COMMON}/system_stm32wlxx.c" "${startup}" \
