@@ -25,6 +25,10 @@ import sys
 import urllib.error
 import urllib.request
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from playwright.sync_api._generated import Page
 
 try:
     from playwright.sync_api import Error as PWError
@@ -56,7 +60,7 @@ BROWSER_UA = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
               "(KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36")
 
 
-def check_reachable(url=REACH_URL, timeout=10, attempts=4):
+def check_reachable(url: str = REACH_URL, timeout: int = 10, attempts: int = 4) -> tuple[bool, str]:
     """Preflight: is st.com actually reachable? Uses a full browser User-Agent
     because st.com rejects bot-like UAs. Retries a few times because st.com's
     Akamai edge can be flaky (intermittent HTTP/2 stream resets), so a single
@@ -129,7 +133,7 @@ def get_password() -> str:
     return pw
 
 
-def click_if_present(page, selectors, timeout=2500):
+def click_if_present(page: Page, selectors: list[str], timeout: int = 2500) -> bool:
     """Best-effort click of the first matching selector; ignore if absent.
 
     timeout is the TOTAL budget, split across the selectors, so a long list of
@@ -151,7 +155,7 @@ def click_if_present(page, selectors, timeout=2500):
     return False
 
 
-def select_linux_os(page):
+def select_linux_os(page: Page) -> bool:
     """In the Get-Software table the OS is chosen via a native <select class=swos>
     (id swos_0); picking Linux there reveals the row's Get-latest button. Select
     Linux in that dropdown and fire change events so the page's JS reacts.
@@ -241,7 +245,7 @@ def select_linux_os(page):
     return True
 
 
-def dump_page(page, label):
+def dump_page(page: Page, label: str) -> None:
     """Print the page's clickable elements (download-relevant ones first) and
     save a screenshot, to help diagnose a missing selector."""
     print(f"--- {label}: {page.url}", file=sys.stderr)
@@ -271,11 +275,11 @@ def dump_page(page, label):
     # Surface the likely download/login controls first.
     pat = re.compile(r"get\s*latest|download|get software|get-software|"
                      r"\.sh|cubeide|accept|agree|login|sign in", re.IGNORECASE)
-    def interesting(r):
+    def interesting(r: dict[str, str]) -> bool:
         return bool(pat.search(r["t"]) or pat.search(r["h"]) or pat.search(r["cls"]))
     hits = [r for r in rows if interesting(r)]
 
-    def show(r):
+    def show(r: dict[str, str]) -> None:
         bits = [f"<{r['tag']}>"]
         if r["t"]:
             bits.append(f"text={r['t']!r}")
